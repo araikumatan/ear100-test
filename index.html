@@ -8240,6 +8240,67 @@
       ]
     }
   };
+  var BONUS_PASS_RATIO = 0.8;
+  var BONUS_CLEAR_BONUS = 50;
+  var BONUS_TEST_LABELS = ["\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u30C1\u30A7\u30C3\u30AF", "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u306E\u30C6\u30B9\u30C8", "\u65B0\u3057\u3044\u554F\u984C\u3067\u30E9\u30F3\u30C0\u30E0\u30C6\u30B9\u30C8"];
+  var randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  var pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function genClockItem() {
+    const h = randInt(1, 12);
+    const kind = pickOne(["oclock", "single", "double", "double"]);
+    let m;
+    if (kind === "oclock") m = 0;
+    else if (kind === "single") m = randInt(1, 9);
+    else m = randInt(10, 59);
+    return { type: "clock", disp: `${h}:${pad2(m)}`, h, m };
+  }
+  function genMoneyItem() {
+    const r = Math.random();
+    if (r < 0.12) return { type: "whole", disp: `$${pickOne([15, 20, 50])}`, d: pickOne([15, 20, 50]) };
+    if (r < 0.24) {
+      const x = pickOne([15, 18, 20, 25]);
+      return { type: "tip", disp: `${x}%`, x };
+    }
+    if (Math.random() < 0.3) {
+      const d2 = randInt(1, 12), c2 = randInt(1, 9);
+      return { type: "price", disp: `$${d2}.${pad2(c2)}`, d: d2, c: c2 };
+    }
+    const d = randInt(1, 30), c = randInt(10, 99);
+    return { type: "price", disp: `$${d}.${pad2(c)}`, d, c };
+  }
+  function genPhoneItem() {
+    return phoneItem(randInt(1, 10), randInt(1, 10), randInt(1, 10));
+  }
+  function genBonusItems(mod, n) {
+    const gen = mod === "time" ? genClockItem : mod === "phone" ? genPhoneItem : genMoneyItem;
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    let guard = 0;
+    while (out.length < n && guard < n * 20) {
+      guard++;
+      const it = gen();
+      if (seen.has(it.disp)) continue;
+      seen.add(it.disp);
+      out.push(it);
+    }
+    return out;
+  }
+  var POINT_MILESTONES = [
+    { pt: 0, label: "\u51FA\u767A\u6E96\u5099", emoji: "\u{1F9F3}" },
+    { pt: 300, label: "\u7A7A\u6E2F\u30C1\u30A7\u30C3\u30AF\u30A4\u30F3", emoji: "\u{1F3AB}" },
+    { pt: 800, label: "\u96E2\u9678", emoji: "\u{1F6EB}" },
+    { pt: 1500, label: "\u30CB\u30E5\u30FC\u30E8\u30FC\u30AF\u4E0A\u7A7A", emoji: "\u2708\uFE0F" },
+    { pt: 2500, label: "\u30DE\u30F3\u30CF\u30C3\u30BF\u30F3\u5230\u7740", emoji: "\u{1F5FD}" },
+    { pt: 4e3, label: "\u65C5\u306E\u9054\u4EBA", emoji: "\u{1F3C6}" }
+  ];
+  function milestoneProgress(points) {
+    let idx = 0;
+    for (let i = 0; i < POINT_MILESTONES.length; i++) if (points >= POINT_MILESTONES[i].pt) idx = i;
+    const cur = POINT_MILESTONES[idx];
+    const next = POINT_MILESTONES[idx + 1] || null;
+    const ratio = next ? Math.min(1, (points - cur.pt) / (next.pt - cur.pt)) : 1;
+    return { idx, cur, next, ratio };
+  }
   var NUM_STAGE_RANDOM_RANGE = [
     { min: 1, max: 20 },
     // ステージ1
@@ -9500,9 +9561,9 @@
     if (it.type === "phone") return String(v1 || "").replace(/\D/g, "") === it.digits;
     return false;
   }
-  function BonusCat({ mod, section, speak, cancel }) {
+  function BonusCat({ mod, section, speak, cancel, update }) {
     const cfg = BONUS_DATA[mod];
-    return section === "test" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusTestHub, { mod, speak, cancel }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusShadow, { shadow: cfg.shadow, speak, cancel });
+    return section === "test" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusTestHub, { mod, speak, cancel, update }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusShadow, { shadow: cfg.shadow, speak, cancel });
   }
   function BonusShadow({ shadow, speak, cancel }) {
     const [playingAll, setPlayingAll] = (0, import_react3.useState)(false);
@@ -9580,43 +9641,41 @@
       }) })
     ] }) });
   }
-  function BonusTestHub({ mod, speak, cancel }) {
+  function BonusTestHub({ mod, speak, cancel, update }) {
     const [level, setLevel] = (0, import_react3.useState)(0);
     if (level === 0) {
-      const levels = [
-        ["1", "\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u30C1\u30A7\u30C3\u30AF", "\u8868\u793A\u3092\u898B\u3066\u3001\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u78BA\u8A8D"],
-        ["2", "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u306E\u30C6\u30B9\u30C8", "\u7DF4\u7FD2\u3057\u305F20\u554F\u304B\u3089\u30B7\u30E3\u30C3\u30D5\u30EB\u3067\u51FA\u984C"],
-        ["3", "\u30E9\u30F3\u30C0\u30E0\u30C6\u30B9\u30C8", "\u7DF4\u7FD2\u3057\u3066\u3044\u306A\u3044\u554F\u984C\u3082\u6DF7\u305C\u3066\u30E9\u30F3\u30C0\u30E0\u51FA\u984C"]
-      ];
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Card, { className: "p-4 space-y-2", children: levels.map(([n, t, d]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-        "button",
-        {
-          onClick: () => setLevel(+n),
-          className: "w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]",
-          style: { backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "span",
-              {
-                className: "w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white",
-                style: { backgroundColor: "var(--mint)" },
-                children: n
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex-1 min-w-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold", style: { color: "var(--ink)" }, children: [
-                "\u30C6\u30B9\u30C8",
-                n,
-                "\uFF1A",
-                t
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-4 space-y-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs mb-1", style: { color: "var(--ink-soft)" }, children: "\u30C6\u30B9\u30C81\u304B\u3089\u9806\u306B\u6311\u6226\u3002\u5408\u683C\u3059\u308B\u3068\u6B21\u306E\u30C6\u30B9\u30C8\u3078\u9032\u3081\u307E\u3059\uFF08\u3044\u3064\u3067\u3082\u9078\u3079\u307E\u3059\uFF09\u3002" }),
+        [1, 2, 3].map((n) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+          "button",
+          {
+            onClick: () => setLevel(n),
+            className: "w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]",
+            style: { backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "span",
+                {
+                  className: "w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white",
+                  style: { backgroundColor: "var(--mint)" },
+                  children: n
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex-1 min-w-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold", style: { color: "var(--ink)" }, children: [
+                  "\u30C6\u30B9\u30C8",
+                  n,
+                  "\uFF1A",
+                  BONUS_TEST_LABELS[n - 1]
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "block text-xs", style: { color: "var(--ink-soft)" }, children: n === 1 ? "\u8868\u793A\u3092\u898B\u3066\u3001\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u78BA\u8A8D" : n === 2 ? "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u304B\u3089\u30B7\u30E3\u30C3\u30D5\u30EB\u3067\u51FA\u984C" : "\u7DF4\u7FD2\u306B\u51FA\u3066\u3053\u306A\u3044\u65B0\u3057\u3044\u554F\u984C\u3092\u51FA\u984C" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "block text-xs", style: { color: "var(--ink-soft)" }, children: d })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: "var(--mint)" }, children: "\u958B\u653E\u4E2D" })
-          ]
-        },
-        n
-      )) });
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: "var(--mint)" }, children: "\u958B\u653E\u4E2D" })
+            ]
+          },
+          n
+        ))
+      ] });
     }
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       BonusSession,
@@ -9625,27 +9684,39 @@
         level,
         speak,
         cancel,
+        update,
         onExit: () => {
           cancel();
           setLevel(0);
-        }
-      }
+        },
+        onNextLevel: level < 3 ? () => {
+          cancel();
+          setLevel(level + 1);
+        } : null
+      },
+      `${mod}-${level}`
     );
   }
-  function BonusSession({ mod, level, speak, cancel, onExit }) {
+  function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }) {
     const cfg = BONUS_DATA[mod];
+    const [seed, setSeed] = (0, import_react3.useState)(0);
     const items = (0, import_react3.useMemo)(() => {
       if (level === 1) return cfg.shadow.slice();
       if (level === 2) return shuffle(cfg.shadow);
-      return shuffle([...cfg.shadow, ...cfg.testExtra || []]);
-    }, [mod, level]);
+      return genBonusItems(mod, 10);
+    }, [mod, level, seed]);
     const [idx, setIdx] = (0, import_react3.useState)(0);
     const [score, setScore] = (0, import_react3.useState)({ c: 0, t: 0 });
     const [result, setResult] = (0, import_react3.useState)(null);
+    const [showCelebrate, setShowCelebrate] = (0, import_react3.useState)(true);
+    const awardedRef = (0, import_react3.useRef)(false);
     const i1Ref = (0, import_react3.useRef)(null);
     const i2Ref = (0, import_react3.useRef)(null);
     const it = items[idx];
     const done = idx >= items.length;
+    const pct = score.t ? Math.round(score.c / score.t * 100) : 0;
+    const passed = score.t > 0 && score.c / score.t >= BONUS_PASS_RATIO;
+    const perfect = score.t > 0 && score.c === score.t;
     (0, import_react3.useEffect)(() => {
       if (done || result) return;
       if (level !== 1 && it) {
@@ -9654,24 +9725,72 @@
       }
     }, [idx, done, result, level]);
     (0, import_react3.useEffect)(() => () => cancel(), [cancel]);
+    (0, import_react3.useEffect)(() => {
+      if (!done || awardedRef.current) return;
+      awardedRef.current = true;
+      const pts = score.c * CONFIG.POINTS_PER_CORRECT + (passed ? BONUS_CLEAR_BONUS : 0);
+      if (pts > 0 && typeof update === "function") {
+        update((prev) => withStudyDayMarked(withPoints(prev, pts), "num"));
+      }
+    }, [done]);
+    const retry = () => {
+      awardedRef.current = false;
+      setShowCelebrate(true);
+      setResult(null);
+      setScore({ c: 0, t: 0 });
+      setIdx(0);
+      if (level === 3) setSeed((s) => s + 1);
+    };
     if (done) {
-      const pct = score.t ? Math.round(score.c / score.t * 100) : 100;
-      const msg = level === 1 ? `\u8A00\u3048\u305F ${score.c} / ${score.t}` : `\u30B9\u30B3\u30A2 ${score.c} / ${score.t}\uFF08${pct}%\uFF09`;
+      const earned = score.c * CONFIG.POINTS_PER_CORRECT + (passed ? BONUS_CLEAR_BONUS : 0);
+      const modeLabel = level === 1 ? "\u8A00\u3048\u305F" : "\u6B63\u89E3";
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3", children: [
+        passed && showCelebrate && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          CelebrationModal,
+          {
+            tier: perfect ? 4 : 2,
+            title: perfect ? "\u5168\u554F\u6B63\u89E3\uFF01\u{1F38A}" : "\u5408\u683C\uFF01\uFF01\u304A\u3081\u3067\u3068\u3046\u3054\u3056\u3044\u307E\u3059\u{1F38A}",
+            message: `\u30C6\u30B9\u30C8${level}\uFF1A${modeLabel} ${score.c} / ${score.t}\uFF08${pct}%\uFF09`,
+            points: earned,
+            onClose: () => setShowCelebrate(false),
+            closeLabel: "\u3064\u3065\u3051\u308B"
+          }
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(GhostButton, { onClick: onExit, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowLeft, { size: 14 }),
           " \u30C6\u30B9\u30C8\u4E00\u89A7\u3078"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-6 text-center space-y-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-lg font-bold", style: { color: "var(--ink)" }, children: "\u304A\u3064\u304B\u308C\u3055\u307E\uFF01" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-mono", style: { color: "var(--ink)" }, children: msg }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: () => {
-            setIdx(0);
-            setScore({ c: 0, t: 0 });
-            setResult(null);
-          }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RotateCcw, { size: 14 }),
-            " \u3082\u3046\u4E00\u5EA6"
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-6 text-center space-y-3", active: true, activeColor: passed ? "var(--mint)" : "var(--amber)", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-lg font-bold", style: { color: "var(--ink)" }, children: passed ? "\u5408\u683C\uFF01\uFF01\u304A\u3081\u3067\u3068\u3046\u3054\u3056\u3044\u307E\u3059 \u{1F38A}" : "\u3042\u3068\u5C11\u3057\uFF01\u3082\u3046\u4E00\u606F \u{1F4AA}" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-mono text-xl", style: { color: "var(--ink)" }, children: [
+            modeLabel,
+            " ",
+            score.c,
+            " / ",
+            score.t,
+            "\uFF08",
+            pct,
+            "%\uFF09"
+          ] }),
+          earned > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-mono font-bold", style: { color: "var(--amber)" }, children: [
+            "+",
+            earned,
+            "pt"
+          ] }),
+          !passed && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs", style: { color: "var(--ink-soft)" }, children: [
+            Math.ceil(score.t * BONUS_PASS_RATIO),
+            "\u554F\u6B63\u89E3\u3067\u5408\u683C\uFF088\u5272\uFF09"
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col sm:flex-row items-center justify-center gap-2 pt-1", children: [
+            passed && onNextLevel ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: onNextLevel, children: [
+              "\u30C6\u30B9\u30C8",
+              level + 1,
+              "\u3078\u9032\u3080 \u2192"
+            ] }) : null,
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(GhostButton, { onClick: retry, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RotateCcw, { size: 14 }),
+              " \u3082\u3046\u4E00\u5EA6"
+            ] })
           ] })
         ] })
       ] });
@@ -9825,7 +9944,7 @@
     { id: "t3", label: "\u7279\u51783" }
   ];
   var NUMPART_CATS = [
-    { id: "stage", label: "\u6570\u5B57\uFF081\u301C5\uFF09" },
+    { id: "stage", label: "\u{1F522} \u6570\u5B57\u30B9\u30C6\u30FC\u30B8" },
     { id: "time", label: "\u{1F550} \u6642\u9593" },
     { id: "money", label: "\u{1F4B5} \u304A\u91D1" },
     { id: "phone", label: "\u{1F4DE} \u96FB\u8A71" }
@@ -10069,6 +10188,51 @@
       )
     ] });
   }
+  function PointMilestones({ points }) {
+    const { idx, cur, next, ratio } = milestoneProgress(points);
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-5", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", { className: "font-display font-semibold flex items-center gap-2 mb-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Award, { size: 18 }),
+        " \u65C5\u306E\u9054\u6210\u5EA6"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3 mb-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "div",
+          {
+            className: "w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0",
+            style: { backgroundColor: "var(--amber-soft)" },
+            children: cur.emoji
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "min-w-0", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-bold", style: { color: "var(--ink)" }, children: cur.label }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-mono text-xs", style: { color: "var(--ink-soft)" }, children: [
+            points.toLocaleString(),
+            "pt",
+            next ? ` \u30FB \u6B21\u307E\u3067\u3042\u3068 ${(next.pt - points).toLocaleString()}pt` : " \u30FB \u6700\u9AD8\u30E9\u30F3\u30AF\u5230\u9054\uFF01"
+          ] })
+        ] })
+      ] }),
+      next && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-2 rounded-full overflow-hidden mb-4", style: { backgroundColor: "var(--bg-soft)" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-full rounded-full transition-all", style: { width: `${Math.round(ratio * 100)}%`, backgroundColor: "var(--amber)" } }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex items-start justify-between gap-1", children: POINT_MILESTONES.map((m, i) => {
+        const reached = points >= m.pt;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center gap-1 flex-1 min-w-0", title: `${m.label}\u30FB${m.pt}pt`, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "div",
+            {
+              className: `w-9 h-9 rounded-full flex items-center justify-center text-base ${reached ? "" : "opacity-30"}`,
+              style: {
+                backgroundColor: reached ? "var(--amber-soft)" : "var(--bg-soft)",
+                border: `1px solid ${i === idx ? "var(--amber)" : "var(--line)"}`
+              },
+              children: m.emoji
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-[9px] font-mono leading-tight text-center", style: { color: reached ? "var(--ink)" : "var(--ink-soft)" }, children: m.pt })
+        ] }, m.pt);
+      }) })
+    ] });
+  }
   function Dashboard({ state, setTab, goTo, wordStages, sentStages, numStages, onResume, update }) {
     const streak = computeStreak(state.studyDays);
     const totalShadow = sumValues(state.wordShadow) + sumValues(state.sentShadow) + sumValues(state.numShadow || {});
@@ -10187,24 +10351,7 @@
             );
           }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-5", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", { className: "font-display font-semibold flex items-center gap-2 mb-3", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Award, { size: 18 }),
-            " \u30D0\u30C3\u30B8"
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-2 gap-2", children: badges.map((b) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-            "div",
-            {
-              className: `rounded-xl p-3 text-center ${b.earned ? "" : "opacity-40"}`,
-              style: { backgroundColor: b.earned ? "var(--indigo-soft)" : "var(--bg-soft)" },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(b.icon, { size: 18, className: "mx-auto mb-1", style: { color: b.earned ? "var(--indigo)" : "var(--ink-soft)" } }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-[11px] font-medium leading-tight", children: b.label })
-              ]
-            },
-            b.id
-          )) })
-        ] })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PointMilestones, { points: state.totalPoints })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ResetPanel, { update })
     ] });
@@ -13013,6 +13160,7 @@
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionToggle, { section, setSection, color: "var(--mint)" }),
+            numPartCat === "stage" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs -mt-2", style: { color: "var(--ink-soft)" }, children: "\u30B9\u30C6\u30FC\u30B81\uFF081\u301C20\uFF09\u2192 2\uFF082\u6841\u306E\u805E\u304D\u5206\u3051\uFF09\u2192 3\uFF083\u6841\uFF09\u2192 4\uFF084\u6841\uFF09\u2192 5\uFF085\u6841\uFF09\u3068\u6841\u6570\u304C\u5897\u3048\u3066\u3044\u304D\u307E\u3059\u3002" }),
             numPartCat === "stage" ? section === "learn" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-5", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               LearnScreen,
               {
@@ -13056,7 +13204,7 @@
                 },
                 devMode
               }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusCat, { mod: numPartCat, section, speak, cancel })
+            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusCat, { mod: numPartCat, section, speak, cancel, update })
           ] })
         ] }),
         tab === "custom" && CONFIG.SHOW_CUSTOM && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
