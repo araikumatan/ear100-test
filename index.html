@@ -8094,6 +8094,16 @@
     return { en: fmtNum(value), parts: decomposeNumberParts(value) };
   }
   var pad2 = (v) => String(v).padStart(2, "0");
+  var NO_AUTOFILL = {
+    autoComplete: "off",
+    autoCorrect: "off",
+    autoCapitalize: "off",
+    spellCheck: false,
+    name: "ear100-answer",
+    "data-1p-ignore": true,
+    "data-lpignore": "true",
+    "data-form-type": "other"
+  };
   function makeClockTarget(h, m) {
     const disp = `${h}:${pad2(m)}`;
     let parts;
@@ -9717,10 +9727,34 @@
     const pct = score.t ? Math.round(score.c / score.t * 100) : 0;
     const passed = score.t > 0 && score.c / score.t >= BONUS_PASS_RATIO;
     const perfect = score.t > 0 && score.c === score.t;
+    const focusFirst = (0, import_react3.useCallback)(() => {
+      const doFocus = () => {
+        const el = i1Ref.current;
+        if (el && !el.disabled) {
+          el.focus();
+          try {
+            el.select();
+          } catch (e) {
+          }
+        }
+      };
+      doFocus();
+      if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(doFocus);
+      window.setTimeout(doFocus, 80);
+      window.setTimeout(doFocus, 260);
+    }, []);
+    const playAndFocus = (0, import_react3.useCallback)(() => {
+      speak(bonusItemToTarget(it), { rate: 1 });
+      focusFirst();
+    }, [it, speak, focusFirst]);
     (0, import_react3.useEffect)(() => {
       if (done || result) return;
       if (level !== 1 && it) {
-        const tm = window.setTimeout(() => speak(bonusItemToTarget(it), { rate: 1 }), 200);
+        focusFirst();
+        const tm = window.setTimeout(() => {
+          speak(bonusItemToTarget(it), { rate: 1 });
+          focusFirst();
+        }, 200);
         return () => window.clearTimeout(tm);
       }
     }, [idx, done, result, level]);
@@ -9848,37 +9882,74 @@
     const inputBox = () => {
       const cls = "w-16 text-center font-mono text-lg rounded-lg px-2 py-2 border";
       const st = { backgroundColor: "var(--bg-soft)", borderColor: "var(--line)", color: "var(--ink)" };
+      const focus2 = () => {
+        if (i2Ref.current) i2Ref.current.focus();
+      };
+      const onEnterSubmit = (e) => {
+        if (e.key === "Enter") submit();
+      };
       if (it.type === "clock")
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-1", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, inputMode: "numeric", placeholder: "H", className: cls, style: st }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              ref: i1Ref,
+              ...NO_AUTOFILL,
+              autoFocus: true,
+              inputMode: "numeric",
+              placeholder: "H",
+              className: cls,
+              style: st,
+              onKeyDown: (e) => {
+                if (e.key === "Enter") focus2();
+              }
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-lg", children: ":" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i2Ref, inputMode: "numeric", placeholder: "MM", className: cls, style: st })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i2Ref, ...NO_AUTOFILL, inputMode: "numeric", placeholder: "MM", className: cls, style: st, onKeyDown: onEnterSubmit })
         ] });
       if (it.type === "price")
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-1", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-lg", children: "$" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, inputMode: "numeric", placeholder: "D", className: cls, style: st }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              ref: i1Ref,
+              ...NO_AUTOFILL,
+              autoFocus: true,
+              inputMode: "numeric",
+              placeholder: "D",
+              className: cls,
+              style: st,
+              onKeyDown: (e) => {
+                if (e.key === "Enter") focus2();
+              }
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-lg", children: "." }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i2Ref, inputMode: "numeric", placeholder: "CC", className: cls, style: st })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i2Ref, ...NO_AUTOFILL, inputMode: "numeric", placeholder: "CC", className: cls, style: st, onKeyDown: onEnterSubmit })
         ] });
       if (it.type === "whole")
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-1", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-lg", children: "$" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, inputMode: "numeric", placeholder: "D", className: cls, style: st })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, ...NO_AUTOFILL, autoFocus: true, inputMode: "numeric", placeholder: "D", className: cls, style: st, onKeyDown: onEnterSubmit })
         ] });
       if (it.type === "phone")
         return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "input",
           {
             ref: i1Ref,
+            ...NO_AUTOFILL,
+            autoFocus: true,
             inputMode: "numeric",
             placeholder: "10\u6841\u306E\u756A\u53F7",
             className: "w-52 text-center font-mono text-lg rounded-lg px-3 py-2 border tracking-widest",
-            style: st
+            style: st,
+            onKeyDown: onEnterSubmit
           }
         );
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-1", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, inputMode: "numeric", placeholder: "%", className: cls, style: st }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ref: i1Ref, ...NO_AUTOFILL, autoFocus: true, inputMode: "numeric", placeholder: "%", className: cls, style: st, onKeyDown: onEnterSubmit }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-lg", children: "%" })
       ] });
     };
@@ -9906,7 +9977,7 @@
           ] })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-4xl text-center", children: "\u{1F50A} \uFF1F" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(GhostButton, { onClick: () => speak(bonusItemToTarget(it), { rate: 1 }), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(GhostButton, { onClick: playAndFocus, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { size: 14 }),
             " \u97F3\u58F0\u3092\u805E\u304F"
           ] }) }),
@@ -12572,6 +12643,8 @@
       };
       window.setTimeout(focus, 0);
       if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(focus);
+      window.setTimeout(focus, 90);
+      window.setTimeout(focus, 260);
     }, []);
     const current = questions[qIndex];
     const modeTitle = mode.type === "stage" ? mode.level === 3 ? `\u30C6\u30B9\u30C83\u300C\u30E9\u30F3\u30C0\u30E0\u30C6\u30B9\u30C8\u300D\u30B9\u30C6\u30FC\u30B8${mode.stageIndex + 1}` : `\u30C6\u30B9\u30C82\u300C\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u300D\u30B9\u30C6\u30FC\u30B8${mode.stageIndex + 1}` : mode.type === "random" ? `\u5B9F\u529B\u8A66\u3057\uFF081\u301C${mode.digits}\u6841\u30DF\u30C3\u30AF\u30B9\uFF09` : "\u9593\u9055\u3044\u5FA9\u7FD2\u30C6\u30B9\u30C8";
@@ -12835,6 +12908,7 @@
             "input",
             {
               ref: inputRef,
+              ...NO_AUTOFILL,
               type: "text",
               inputMode: "numeric",
               pattern: "[0-9]*",
