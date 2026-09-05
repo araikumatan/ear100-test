@@ -453,6 +453,19 @@ function makeNumberSpeakTarget(value) {
  * ======================================================================= */
 const pad2 = (v) => String(v).padStart(2, "0");
 
+// 数字入力欄への共通属性。SafariのオートフィルがクレカやパスワードとしてUI（黄色バー等）を出すのを抑止する。
+// name はクレカ的な語を避け、各種パスワード管理拡張（1Password/LastPass等）の割り込みも無効化する。
+const NO_AUTOFILL = {
+  autoComplete: "off",
+  autoCorrect: "off",
+  autoCapitalize: "off",
+  spellCheck: false,
+  name: "ear100-answer",
+  "data-1p-ignore": true,
+  "data-lpignore": "true",
+  "data-form-type": "other",
+};
+
 // 時計 H:MM → parts。 :00=[oclock_H] / :0M=[xoh_H,dig_M] / :MM=[cont_H,term_MM]
 function makeClockTarget(h, m) {
   const disp = `${h}:${pad2(m)}`;
@@ -582,8 +595,8 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
 function genClockItem() {
   const h = randInt(1, 12);
-  // :00 / 1桁分 / 2桁分 をバランスよく（2桁分を多めに）
-  const kind = pickOne(["oclock", "single", "double", "double"]);
+  // ちょうど（:00）は出しすぎないよう抑えめ。1桁分・2桁分（特に2桁分）を多めに。
+  const kind = pickOne(["oclock", "single", "single", "double", "double", "double", "double"]);
   let m;
   if (kind === "oclock") m = 0;
   else if (kind === "single") m = randInt(1, 9);
@@ -2393,11 +2406,29 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   const passed = score.t > 0 && score.c / score.t >= BONUS_PASS_RATIO;
   const perfect = score.t > 0 && score.c === score.t;
 
-  // 入力式は問題表示時に自動でお手本を鳴らす
+  // 入力欄（先頭）に確実にフォーカスを当てる。音声再生でフォーカスが奪われる瞬間に備えて複数タイミングで試行。
+  const focusFirst = useCallback(() => {
+    const doFocus = () => {
+      const el = i1Ref.current;
+      if (el && !el.disabled) { el.focus(); try { el.select(); } catch (e) {} }
+    };
+    doFocus();
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(doFocus);
+    window.setTimeout(doFocus, 80);
+    window.setTimeout(doFocus, 260); // 自動再生（200ms後）でフォーカスが動いても取り返す
+  }, []);
+  // 音声を鳴らしつつ入力欄へフォーカスを戻す（「音声を聞く」「もう一度」用）
+  const playAndFocus = useCallback(() => {
+    speak(bonusItemToTarget(it), { rate: 1.0 });
+    focusFirst();
+  }, [it, speak, focusFirst]);
+
+  // 入力式は問題表示時に自動でお手本を鳴らし、入力欄にフォーカスを当てる
   useEffect(() => {
     if (done || result) return;
     if (level !== 1 && it) {
-      const tm = window.setTimeout(() => speak(bonusItemToTarget(it), { rate: 1.0 }), 200);
+      focusFirst(); // まず即フォーカス
+      const tm = window.setTimeout(() => { speak(bonusItemToTarget(it), { rate: 1.0 }); focusFirst(); }, 200);
       return () => window.clearTimeout(tm);
     }
   }, [idx, done, result, level]);
@@ -2511,43 +2542,50 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   const inputBox = () => {
     const cls = "w-16 text-center font-mono text-lg rounded-lg px-2 py-2 border";
     const st = { backgroundColor: "var(--bg-soft)", borderColor: "var(--line)", color: "var(--ink)" };
+    const focus2 = () => { if (i2Ref.current) i2Ref.current.focus(); };
+    const onEnterSubmit = (e) => { if (e.key === "Enter") submit(); };
     if (it.type === "clock")
       return (
         <span className="inline-flex items-center gap-1">
-          <input ref={i1Ref} inputMode="numeric" placeholder="H" className={cls} style={st} />
+          <input ref={i1Ref} {...NO_AUTOFILL} autoFocus inputMode="numeric" placeholder="H" className={cls} style={st}
+            onKeyDown={(e) => { if (e.key === "Enter") focus2(); }} />
           <span className="font-mono text-lg">:</span>
-          <input ref={i2Ref} inputMode="numeric" placeholder="MM" className={cls} style={st} />
+          <input ref={i2Ref} {...NO_AUTOFILL} inputMode="numeric" placeholder="MM" className={cls} style={st} onKeyDown={onEnterSubmit} />
         </span>
       );
     if (it.type === "price")
       return (
         <span className="inline-flex items-center gap-1">
           <span className="font-mono text-lg">$</span>
-          <input ref={i1Ref} inputMode="numeric" placeholder="D" className={cls} style={st} />
+          <input ref={i1Ref} {...NO_AUTOFILL} autoFocus inputMode="numeric" placeholder="D" className={cls} style={st}
+            onKeyDown={(e) => { if (e.key === "Enter") focus2(); }} />
           <span className="font-mono text-lg">.</span>
-          <input ref={i2Ref} inputMode="numeric" placeholder="CC" className={cls} style={st} />
+          <input ref={i2Ref} {...NO_AUTOFILL} inputMode="numeric" placeholder="CC" className={cls} style={st} onKeyDown={onEnterSubmit} />
         </span>
       );
     if (it.type === "whole")
       return (
         <span className="inline-flex items-center gap-1">
           <span className="font-mono text-lg">$</span>
-          <input ref={i1Ref} inputMode="numeric" placeholder="D" className={cls} style={st} />
+          <input ref={i1Ref} {...NO_AUTOFILL} autoFocus inputMode="numeric" placeholder="D" className={cls} style={st} onKeyDown={onEnterSubmit} />
         </span>
       );
     if (it.type === "phone")
       return (
         <input
           ref={i1Ref}
+          {...NO_AUTOFILL}
+          autoFocus
           inputMode="numeric"
           placeholder="10桁の番号"
           className="w-52 text-center font-mono text-lg rounded-lg px-3 py-2 border tracking-widest"
           style={st}
+          onKeyDown={onEnterSubmit}
         />
       );
     return (
       <span className="inline-flex items-center gap-1">
-        <input ref={i1Ref} inputMode="numeric" placeholder="%" className={cls} style={st} />
+        <input ref={i1Ref} {...NO_AUTOFILL} autoFocus inputMode="numeric" placeholder="%" className={cls} style={st} onKeyDown={onEnterSubmit} />
         <span className="font-mono text-lg">%</span>
       </span>
     );
@@ -2574,7 +2612,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
           <>
             <p className="text-4xl text-center">🔊 ？</p>
             <div className="flex justify-center">
-              <GhostButton onClick={() => speak(bonusItemToTarget(it), { rate: 1.0 })}><Play size={14} /> 音声を聞く</GhostButton>
+              <GhostButton onClick={playAndFocus}><Play size={14} /> 音声を聞く</GhostButton>
             </div>
             <div className="flex justify-center">{inputBox()}</div>
             <div className="flex justify-center">
@@ -2907,22 +2945,25 @@ function PointMilestones({ points }) {
           <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(ratio * 100)}%`, backgroundColor: "var(--amber)" }} />
         </div>
       )}
-      <div className="flex items-start justify-between gap-1">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {POINT_MILESTONES.map((m, i) => {
           const reached = points >= m.pt;
+          const isCur = i === idx;
           return (
-            <div key={m.pt} className="flex flex-col items-center gap-1 flex-1 min-w-0" title={`${m.label}・${m.pt}pt`}>
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${reached ? "" : "opacity-30"}`}
-                style={{
-                  backgroundColor: reached ? "var(--amber-soft)" : "var(--bg-soft)",
-                  border: `1px solid ${i === idx ? "var(--amber)" : "var(--line)"}`,
-                }}
-              >
-                {m.emoji}
-              </div>
-              <span className="text-[9px] font-mono leading-tight text-center" style={{ color: reached ? "var(--ink)" : "var(--ink-soft)" }}>
-                {m.pt}
+            <div
+              key={m.pt}
+              className={`rounded-xl px-1 py-2.5 flex flex-col items-center gap-1 text-center ${reached ? "" : "opacity-40"}`}
+              style={{
+                backgroundColor: reached ? "var(--amber-soft)" : "var(--bg-soft)",
+                border: `${isCur ? 2 : 1}px solid ${isCur ? "var(--amber)" : "var(--line)"}`,
+              }}
+            >
+              <span className="text-2xl leading-none">{m.emoji}</span>
+              <span className="text-[11px] font-semibold leading-tight" style={{ color: reached ? "var(--ink)" : "var(--ink-soft)" }}>
+                {m.label}
+              </span>
+              <span className="text-[10px] font-mono leading-none" style={{ color: reached ? "var(--amber)" : "var(--ink-soft)" }}>
+                {m.pt}pt
               </span>
             </div>
           );
@@ -5514,9 +5555,12 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
       const el = inputRef.current;
       if (el && !el.disabled) el.focus();
     };
-    // ボタンクリック直後やDOM更新直後でも確実に当たるよう、複数タイミングで試行
+    // ボタンクリック直後やDOM更新直後でも確実に当たるよう、複数タイミングで試行。
+    // 自動再生（speak）でフォーカスが一瞬奪われても、遅延リトライで取り返す。
     window.setTimeout(focus, 0);
     if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(focus);
+    window.setTimeout(focus, 90);
+    window.setTimeout(focus, 260);
   }, []);
 
   const current = questions[qIndex];
@@ -5817,6 +5861,7 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
         <div className="w-full max-w-xs flex flex-col items-center gap-1">
           <input
             ref={inputRef}
+            {...NO_AUTOFILL}
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
