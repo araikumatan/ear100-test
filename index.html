@@ -8893,7 +8893,9 @@
     const currentSourceRef = (0, import_react3.useRef)(null);
     const currentAudioRef = (0, import_react3.useRef)(null);
     const currentSourcesRef = (0, import_react3.useRef)([]);
+    const speakGenRef = (0, import_react3.useRef)(0);
     const stopAudio = (0, import_react3.useCallback)(() => {
+      speakGenRef.current += 1;
       const s = currentSourceRef.current;
       if (s) {
         s.onended = null;
@@ -8985,6 +8987,26 @@
               onstart && onstart();
               return;
             } catch (e) {
+            }
+          }
+          {
+            const attempt = opts._partsAttempt || 0;
+            if (attempt < 16) {
+              if (ctx) {
+                if (ctx.state === "suspended") {
+                  try {
+                    ctx.resume();
+                  } catch (e) {
+                  }
+                }
+                item.parts.forEach((pid) => getNumberPartBuffer(pid, rate));
+              }
+              const gen = speakGenRef.current;
+              window.setTimeout(() => {
+                if (speakGenRef.current !== gen) return;
+                speak(target, { ...opts, _partsAttempt: attempt + 1 });
+              }, 100);
+              return;
             }
           }
           ttsSpeak();
@@ -13267,7 +13289,7 @@
       [state, devMode]
     );
     (0, import_react3.useEffect)(() => {
-      if (tab !== "num") return;
+      if (tab !== "bonus") return;
       const numSpeeds = [0.7, 1, 1.5, 2];
       const items = numStages.filter((s) => s.unlocked || devMode).flatMap((s) => s.items || []);
       if (items.length) preloadNumberParts(items, numSpeeds);

@@ -1405,7 +1405,10 @@ function useSpeech() {
   const currentAudioRef = useRef(null);
   // 数字パーツ連結再生では複数の BufferSource を同時に予約するため、配列で全部追跡する
   const currentSourcesRef = useRef([]);
+  // speak の世代カウンタ。stopAudio のたびに進め、遅延リトライが古い再生を鳴らさないようにする。
+  const speakGenRef = useRef(0);
   const stopAudio = useCallback(() => {
+    speakGenRef.current += 1; // 進行中の遅延リトライを無効化
     const s = currentSourceRef.current;
     if (s) {
       s.onended = null;
@@ -1520,7 +1523,25 @@ function useSpeech() {
             // 失敗したら TTS へ
           }
         }
-        // パーツが未ロード or 再生失敗 → TTS フォールバック（en を読む）
+        // パーツが未ロード（スプライトのデコードが間に合っていない／ctxが一瞬取れない等）→ すぐTTSに落とさず、
+        // 読み込み・resume を促してから少し待って録音でリトライする。「ステージ直後の1回目だけAI音声」を防ぐ。
+        // 最大約1.6秒待ってもダメなときだけ TTS フォールバック。
+        {
+          const attempt = opts._partsAttempt || 0;
+          if (attempt < 16) {
+            if (ctx) {
+              if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+              item.parts.forEach((pid) => getNumberPartBuffer(pid, rate)); // スプライト読み込みを起動
+            }
+            const gen = speakGenRef.current;
+            window.setTimeout(() => {
+              if (speakGenRef.current !== gen) return; // その後 stop/別再生が入ったら中止
+              speak(target, { ...opts, _partsAttempt: attempt + 1 });
+            }, 100);
+            return;
+          }
+        }
+        // ここまでで用意できなければ TTS フォールバック（en を読む）
         ttsSpeak();
         return;
       }
@@ -6237,10 +6258,11 @@ export default function App() {
     () => computeStages("num", NUMBERS, state, { chunks: NUM_STAGE_ITEMS, testLevels: 3, alwaysUnlocked: devMode }),
     [state, devMode]
   );
-  // 数字パーツは①「表示中（＝解放済み）ステージ分だけ」を数字タブを開いたときに遅延プリロードする。
+  // 数字パーツは①「表示中（＝解放済み）ステージ分だけ」を特典（数字パート）タブを開いたときに遅延プリロードする。
+  // ※数字ステージは「特典」タブ内に集約したので、旧 "num" タブではなく "bonus" で先読みする（これを外すと初回再生がTTSに化ける）。
   // 全203×4速度を先読みしないことで起動を軽く保つ。数字は 0.5x 非対応（070/100/150/200 のみ）。
   useEffect(() => {
-    if (tab !== "num") return;
+    if (tab !== "bonus") return;
     const numSpeeds = [0.7, 1.0, 1.5, 2.0];
     // 解放済みステージの全数字（音読＋テスト対象）を集めてパーツを先読み
     const items = numStages
