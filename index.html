@@ -9084,6 +9084,32 @@
       hasEnglishVoice: englishVoices.length > 0
     };
   }
+  function PassStamp({ label = "\u5408\u683C!", color = "var(--mint)", size = "sm" }) {
+    const big = size === "lg";
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "span",
+      {
+        className: "inline-flex items-center gap-1 font-display font-extrabold select-none",
+        style: {
+          transform: "rotate(-7deg)",
+          border: `2px solid ${color}`,
+          color,
+          borderRadius: 7,
+          padding: big ? "3px 10px" : "1px 7px",
+          fontSize: big ? 15 : 12,
+          letterSpacing: "1px",
+          lineHeight: 1,
+          boxShadow: `inset 0 0 0 1px ${color}`,
+          backgroundColor: "rgba(255,255,255,0.5)"
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: big ? 15 : 12 }),
+          " ",
+          label
+        ]
+      }
+    );
+  }
   function GlowAutoScroll() {
     (0, import_react3.useEffect)(() => {
       let lastKey = null;
@@ -9243,10 +9269,11 @@
       i
     )) });
   }
-  function Card({ children, className = "", active = false, activeColor = "var(--coral)" }) {
+  function Card({ children, className = "", active = false, activeColor = "var(--coral)", id }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "div",
       {
+        id,
         className: `rounded-2xl ${className}`,
         style: { backgroundColor: "var(--card)", border: `1px solid ${active ? activeColor : "var(--line)"}` },
         children
@@ -9754,15 +9781,16 @@
                   }
                 ),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex-1 min-w-0", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold", style: { color: "var(--ink)" }, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold flex items-center gap-1.5", style: { color: "var(--ink)" }, children: [
                     "\u30C6\u30B9\u30C8",
                     n,
                     "\uFF1A",
-                    BONUS_TEST_LABELS[n - 1]
+                    BONUS_TEST_LABELS[n - 1],
+                    cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u5408\u683C!" })
                   ] }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "block text-xs", style: { color: "var(--ink-soft)" }, children: n === 1 ? "\u8868\u793A\u3092\u898B\u3066\u3001\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u78BA\u8A8D" : n === 2 ? "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u304B\u3089\u30B7\u30E3\u30C3\u30D5\u30EB\u3067\u51FA\u984C" : "\u7DF4\u7FD2\u306B\u51FA\u3066\u3053\u306A\u3044\u65B0\u3057\u3044\u554F\u984C\u3092\u51FA\u984C" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: cleared ? "var(--mint)" : "var(--ink-soft)" }, children: cleared ? "\u5408\u683C\u6E08\u307F" : "\u6311\u6226\u3059\u308B" })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: cleared ? "var(--mint)" : "var(--ink-soft)" }, children: cleared ? "" : "\u6311\u6226\u3059\u308B" })
               ]
             },
             n
@@ -10695,6 +10723,11 @@
     const [setPlayedStage, setSetPlayedStage] = (0, import_react3.useState)(null);
     const playTokenRef = (0, import_react3.useRef)(0);
     (0, import_react3.useEffect)(() => {
+      if (activeId == null) return;
+      const el = document.getElementById(`${kind}-item-${activeId}`);
+      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, [activeId, kind]);
+    (0, import_react3.useEffect)(() => {
       return () => {
         playTokenRef.current += 1;
         cancel();
@@ -10950,18 +10983,8 @@
                       unit,
                       ")"
                     ] }),
-                    stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                      "span",
-                      {
-                        className: "flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full",
-                        style: { backgroundColor: "var(--mint-soft)", color: "var(--mint)" },
-                        children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: 11 }),
-                          " \u30AF\u30EA\u30A2"
-                        ]
-                      }
-                    ),
-                    isNextStage && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u5408\u683C!" }),
+                    isNextStage && !stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                       "span",
                       {
                         className: "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
@@ -11063,7 +11086,7 @@
             const count = progressMap[item.id] || 0;
             const active = activeId === item.id;
             const shadowOk = count >= CONFIG.SHADOW_REQUIRED;
-            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { active, className: "p-4 flex flex-col gap-3", children: [
+            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { id: `${kind}-item-${item.id}`, active, className: "p-4 flex flex-col gap-3", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-start justify-between gap-2", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-display font-semibold text-base flex items-center gap-1.5", children: [
@@ -12617,17 +12640,7 @@
               "\u300C",
               NUM_STAGE_TITLES[st.index],
               "\u300D",
-              st.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                "span",
-                {
-                  className: "flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full",
-                  style: { backgroundColor: "var(--mint-soft)", color: "var(--mint)" },
-                  children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: 11 }),
-                    " \u30B9\u30C6\u30FC\u30B8\u30AF\u30EA\u30A2"
-                  ]
-                }
-              ),
+              st.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u30AF\u30EA\u30A2!" }),
               !st.unlocked && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                 "span",
                 {
@@ -12670,6 +12683,7 @@
                       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm font-semibold flex items-center gap-1.5", children: [
                         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon2, { size: 13, style: { color: done ? "var(--mint)" : s.color } }),
                         s.title,
+                        done && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u5408\u683C!" }),
                         isNext && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                           "span",
                           {

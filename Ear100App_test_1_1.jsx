@@ -1638,6 +1638,30 @@ function useSpeech() {
 
 // 点滅（.guide-glow / .guide-glow-mint）中の要素を、対象が変わるたびに画面中央へ自動スクロールする。
 // 各所にrefを配線せず一括対応。guideBarのように同じ点滅が複数あるときはビューポート中央に最も近いものを選ぶ。
+// 合格スタンプ（判子風）。色だけでなく一目で「合格！」とわかる回転バッジ。
+function PassStamp({ label = "合格!", color = "var(--mint)", size = "sm" }) {
+  const big = size === "lg";
+  return (
+    <span
+      className="inline-flex items-center gap-1 font-display font-extrabold select-none"
+      style={{
+        transform: "rotate(-7deg)",
+        border: `2px solid ${color}`,
+        color,
+        borderRadius: 7,
+        padding: big ? "3px 10px" : "1px 7px",
+        fontSize: big ? 15 : 12,
+        letterSpacing: "1px",
+        lineHeight: 1,
+        boxShadow: `inset 0 0 0 1px ${color}`,
+        backgroundColor: "rgba(255,255,255,0.5)",
+      }}
+    >
+      <CheckCircle2 size={big ? 15 : 12} /> {label}
+    </span>
+  );
+}
+
 function GlowAutoScroll() {
   useEffect(() => {
     let lastKey = null;
@@ -1799,9 +1823,10 @@ function CountdownBars({ remainingMs, totalMs = 4000, segments = 18 }) {
   );
 }
 
-function Card({ children, className = "", active = false, activeColor = "var(--coral)" }) {
+function Card({ children, className = "", active = false, activeColor = "var(--coral)", id }) {
   return (
     <div
+      id={id}
       className={`rounded-2xl ${className}`}
       style={{ backgroundColor: "var(--card)", border: `1px solid ${active ? activeColor : "var(--line)"}` }}
     >
@@ -2423,15 +2448,16 @@ function BonusTestHub({ mod, speak, cancel, update, state }) {
                 {cleared ? <Check size={16} /> : n}
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                <span className="block text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
                   テスト{n}：{BONUS_TEST_LABELS[n - 1]}
+                  {cleared && <PassStamp label="合格!" />}
                 </span>
                 <span className="block text-xs" style={{ color: "var(--ink-soft)" }}>
                   {n === 1 ? "表示を見て、自分で言えるか確認" : n === 2 ? "練習した問題からシャッフルで出題" : "練習に出てこない新しい問題を出題"}
                 </span>
               </span>
               <span className="text-xs font-semibold" style={{ color: cleared ? "var(--mint)" : "var(--ink-soft)" }}>
-                {cleared ? "合格済み" : "挑戦する"}
+                {cleared ? "" : "挑戦する"}
               </span>
             </button>
           );
@@ -3368,6 +3394,13 @@ function LearnScreen({
 
   const playTokenRef = useRef(0);
 
+  // セット再生・個別再生で「いま鳴っている項目」を画面中央へ寄せる（どれを読んでいるか一目でわかるように）
+  useEffect(() => {
+    if (activeId == null) return;
+    const el = document.getElementById(`${kind}-item-${activeId}`);
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeId, kind]);
+
   useEffect(() => {
     return () => {
       playTokenRef.current += 1;
@@ -3637,15 +3670,8 @@ function LearnScreen({
                     ({stage.items.length}
                     {unit})
                   </span>
-                  {stage.cleared && (
-                    <span
-                      className="flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full"
-                      style={{ backgroundColor: "var(--mint-soft)", color: "var(--mint)" }}
-                    >
-                      <CheckCircle2 size={11} /> クリア
-                    </span>
-                  )}
-                  {isNextStage && (
+                  {stage.cleared && <PassStamp label="合格!" />}
+                  {isNextStage && !stage.cleared && (
                     <span
                       className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
                       style={{ backgroundColor: "var(--indigo)", color: "#fff" }}
@@ -3742,7 +3768,7 @@ function LearnScreen({
                 const active = activeId === item.id;
                 const shadowOk = count >= CONFIG.SHADOW_REQUIRED;
                 return (
-                  <Card key={item.id} active={active} className="p-4 flex flex-col gap-3">
+                  <Card key={item.id} id={`${kind}-item-${item.id}`} active={active} className="p-4 flex flex-col gap-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-display font-semibold text-base flex items-center gap-1.5">
@@ -5498,14 +5524,7 @@ function NumberTestHub({
             <Card key={st.index} className="p-4 space-y-3">
               <p className="font-display font-semibold text-sm flex items-center gap-1.5 flex-wrap">
                 ステージ{st.index + 1}「{NUM_STAGE_TITLES[st.index]}」
-                {st.cleared && (
-                  <span
-                    className="flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full"
-                    style={{ backgroundColor: "var(--mint-soft)", color: "var(--mint)" }}
-                  >
-                    <CheckCircle2 size={11} /> ステージクリア
-                  </span>
-                )}
+                {st.cleared && <PassStamp label="クリア!" />}
                 {!st.unlocked && (
                   <span
                     className="flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full"
@@ -5547,6 +5566,7 @@ function NumberTestHub({
                           <p className="text-sm font-semibold flex items-center gap-1.5">
                             <Icon size={13} style={{ color: done ? "var(--mint)" : s.color }} />
                             {s.title}
+                            {done && <PassStamp label="合格!" />}
                             {isNext && (
                               <span
                                 className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
