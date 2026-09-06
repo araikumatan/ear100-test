@@ -9086,26 +9086,32 @@
   }
   function PassStamp({ label = "\u5408\u683C!", color = "var(--mint)", size = "sm" }) {
     const big = size === "lg";
+    const fs = big ? 20 : 15;
+    const rot = big ? -11 : -9;
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
       "span",
       {
-        className: "inline-flex items-center gap-1 font-display font-extrabold select-none",
+        className: "relative inline-flex items-center gap-1 font-display font-black select-none align-middle",
         style: {
-          transform: "rotate(-7deg)",
-          border: `2px solid ${color}`,
+          transform: `rotate(${rot}deg)`,
           color,
-          borderRadius: 7,
-          padding: big ? "3px 10px" : "1px 7px",
-          fontSize: big ? 15 : 12,
-          letterSpacing: "1px",
+          border: `2.5px solid ${color}`,
+          borderRadius: 9,
+          padding: big ? "4px 12px" : "2px 9px",
+          margin: big ? "0 4px" : "-2px 3px",
+          // 少し外にはみ出させて“押した”感
+          fontSize: fs,
+          letterSpacing: "1.5px",
           lineHeight: 1,
-          boxShadow: `inset 0 0 0 1px ${color}`,
-          backgroundColor: "rgba(255,255,255,0.5)"
+          boxShadow: `inset 0 0 0 2px ${color}, 0 1px 2px rgba(0,0,0,0.12)`,
+          backgroundColor: "rgba(255,255,255,0.65)",
+          textShadow: "0 0 1px rgba(255,255,255,0.6)",
+          whiteSpace: "nowrap"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: big ? 15 : 12 }),
-          " ",
-          label
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: big ? 16 : 13 }, children: "\u2605" }),
+          label,
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: big ? 16 : 13 }, children: "\u2605" })
         ]
       }
     );
@@ -10283,20 +10289,44 @@
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, { value: clearedCount, max: stages.length, color, height: 8 }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-5 gap-2 mt-4", children: stages.map((st) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-5 gap-2 mt-4", children: stages.map((st) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "div",
         {
-          className: "rounded-xl p-2 text-center",
+          className: "rounded-xl p-2 text-center flex flex-col items-center justify-center gap-1 min-h-[70px]",
           style: {
             backgroundColor: st.cleared ? softColor : st.unlocked ? "var(--card)" : "var(--bg-soft)",
             border: `1px solid ${st.cleared ? color : "var(--line)"}`,
             opacity: st.unlocked || st.cleared ? 1 : 0.6
           },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-mono text-xs font-bold", style: { color: st.cleared ? color : "var(--ink)" }, children: st.cleared ? "\u2713" : st.unlocked ? st.index + 1 : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { size: 11, className: "mx-auto" }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-[10px] mt-1 font-mono", style: { color: "var(--ink-soft)" }, children: st.cleared ? "\u5408\u683C" : st.unlocked ? `\u97F3\u8AAD${st.shadowDone}/${st.shadowTotal}` : "\u30ED\u30C3\u30AF" }),
-            !st.cleared && st.unlocked && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-[10px] font-mono", style: { color: st.best > 0 ? "var(--amber)" : "var(--ink-soft)" }, children: st.best > 0 ? `\u6700\u9AD8${st.best}/${st.shadowTotal}` : "\u30C6\u30B9\u30C8\u672A" })
-          ]
+          children: st.cleared ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "span",
+              {
+                className: "inline-flex items-center justify-center font-display font-black",
+                style: {
+                  width: 38,
+                  height: 38,
+                  borderRadius: "50%",
+                  border: `2.5px solid ${color}`,
+                  boxShadow: `inset 0 0 0 2px ${color}`,
+                  color,
+                  transform: "rotate(-12deg)",
+                  fontSize: 11,
+                  letterSpacing: "0.5px",
+                  backgroundColor: "rgba(255,255,255,0.55)"
+                },
+                children: "\u5408\u683C"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-[10px] font-mono", style: { color }, children: [
+              "\u30B9\u30C6\u30FC\u30B8",
+              st.index + 1
+            ] })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-mono text-xs font-bold", style: { color: "var(--ink)" }, children: st.unlocked ? st.index + 1 : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { size: 11, className: "mx-auto" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-[10px] font-mono", style: { color: "var(--ink-soft)" }, children: st.unlocked ? `\u97F3\u8AAD${st.shadowDone}/${st.shadowTotal}` : "\u30ED\u30C3\u30AF" }),
+            st.unlocked && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-[10px] font-mono", style: { color: st.best > 0 ? "var(--amber)" : "var(--ink-soft)" }, children: st.best > 0 ? `\u6700\u9AD8${st.best}/${st.shadowTotal}` : "\u30C6\u30B9\u30C8\u672A" })
+          ] })
         },
         st.index
       )) }),
@@ -10895,7 +10925,7 @@
               {
                 onClick: stopPlayback,
                 className: "inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform",
-                style: { backgroundColor: "var(--red)" },
+                style: { backgroundColor: "var(--indigo)" },
                 children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Square, { size: 16 }),
                   " \u505C\u6B62"
@@ -10918,7 +10948,7 @@
               {
                 onClick: () => markShadowBulk(stage),
                 className: `inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "mark" ? "guide-glow" : ""}`,
-                style: { backgroundColor: shadowFull ? "var(--mint)" : "var(--coral)" },
+                style: { backgroundColor: "var(--coral)" },
                 children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 16 }),
                   " ",
@@ -10983,7 +11013,7 @@
                       unit,
                       ")"
                     ] }),
-                    stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u5408\u683C!" }),
+                    stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u5408\u683C!", size: "lg" }),
                     isNextStage && !stage.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                       "span",
                       {
@@ -12408,7 +12438,14 @@
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 min-w-[100px]", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, { value: qIndex, max: questions.length, color: "var(--indigo)", height: 8 }) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-6 flex flex-col items-center gap-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm", style: { color: "var(--ink-soft)" }, children: "\u3053\u306E\u6570\u5B57\u3092\u82F1\u8A9E\u3067\u58F0\u306B\u51FA\u3057\u3066\u8A00\u3063\u3066\u307F\u3088\u3046" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "p",
+          {
+            className: `text-sm ${qIndex === 0 && !revealed ? "guide-glow px-3 py-1.5 rounded-full" : ""}`,
+            style: { color: qIndex === 0 && !revealed ? "var(--indigo)" : "var(--ink-soft)", fontWeight: qIndex === 0 && !revealed ? 700 : 400 },
+            children: "\u3053\u306E\u6570\u5B57\u3092\u82F1\u8A9E\u3067\u58F0\u306B\u51FA\u3057\u3066\u8A00\u3063\u3066\u307F\u3088\u3046"
+          }
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-mono text-5xl font-bold", children: fmtNum(value) }),
         !revealed ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           PrimaryButton,
@@ -12640,7 +12677,7 @@
               "\u300C",
               NUM_STAGE_TITLES[st.index],
               "\u300D",
-              st.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u30AF\u30EA\u30A2!" }),
+              st.cleared && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PassStamp, { label: "\u30AF\u30EA\u30A2!", size: "lg" }),
               !st.unlocked && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                 "span",
                 {
@@ -12986,11 +13023,11 @@
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap justify-center gap-2 pt-1", children: [
             pass && onNextStageLearn ? (
               // ステージの最終テストに合格 → 次のステージの学習へ進むのが基本の流れ
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: onNextStageLearn, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: onNextStageLearn, className: "guide-glow", children: [
                 "\u6B21\u306E\u30B9\u30C6\u30FC\u30B8\u306E\u5B66\u7FD2\u306B\u9032\u3080 ",
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { size: 14 })
               ] })
-            ) : pass && onNextLevel ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: onNextLevel, children: [
+            ) : pass && onNextLevel ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: onNextLevel, className: "guide-glow", children: [
               "\u6B21\u306E\u30C6\u30B9\u30C8\u3078\u9032\u3080 ",
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { size: 14 })
             ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: restart, children: [

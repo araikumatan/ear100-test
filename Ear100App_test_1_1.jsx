@@ -1638,26 +1638,33 @@ function useSpeech() {
 
 // 点滅（.guide-glow / .guide-glow-mint）中の要素を、対象が変わるたびに画面中央へ自動スクロールする。
 // 各所にrefを配線せず一括対応。guideBarのように同じ点滅が複数あるときはビューポート中央に最も近いものを選ぶ。
-// 合格スタンプ（判子風）。色だけでなく一目で「合格！」とわかる回転バッジ。
+// 合格スタンプ（パスポート風）。枠からはみ出すくらい大きく、達成感が出る二重リング＋星の判子。
 function PassStamp({ label = "合格!", color = "var(--mint)", size = "sm" }) {
   const big = size === "lg";
+  const fs = big ? 20 : 15;
+  const rot = big ? -11 : -9;
   return (
     <span
-      className="inline-flex items-center gap-1 font-display font-extrabold select-none"
+      className="relative inline-flex items-center gap-1 font-display font-black select-none align-middle"
       style={{
-        transform: "rotate(-7deg)",
-        border: `2px solid ${color}`,
+        transform: `rotate(${rot}deg)`,
         color,
-        borderRadius: 7,
-        padding: big ? "3px 10px" : "1px 7px",
-        fontSize: big ? 15 : 12,
-        letterSpacing: "1px",
+        border: `2.5px solid ${color}`,
+        borderRadius: 9,
+        padding: big ? "4px 12px" : "2px 9px",
+        margin: big ? "0 4px" : "-2px 3px", // 少し外にはみ出させて“押した”感
+        fontSize: fs,
+        letterSpacing: "1.5px",
         lineHeight: 1,
-        boxShadow: `inset 0 0 0 1px ${color}`,
-        backgroundColor: "rgba(255,255,255,0.5)",
+        boxShadow: `inset 0 0 0 2px ${color}, 0 1px 2px rgba(0,0,0,0.12)`,
+        backgroundColor: "rgba(255,255,255,0.65)",
+        textShadow: "0 0 1px rgba(255,255,255,0.6)",
+        whiteSpace: "nowrap",
       }}
     >
-      <CheckCircle2 size={big ? 15 : 12} /> {label}
+      <span style={{ fontSize: big ? 16 : 13 }}>★</span>
+      {label}
+      <span style={{ fontSize: big ? 16 : 13 }}>★</span>
     </span>
   );
 }
@@ -2915,23 +2922,48 @@ function StageOverview({ label, stages, color, softColor, onGo }) {
         {stages.map((st) => (
           <div
             key={st.index}
-            className="rounded-xl p-2 text-center"
+            className="rounded-xl p-2 text-center flex flex-col items-center justify-center gap-1 min-h-[70px]"
             style={{
               backgroundColor: st.cleared ? softColor : st.unlocked ? "var(--card)" : "var(--bg-soft)",
               border: `1px solid ${st.cleared ? color : "var(--line)"}`,
               opacity: st.unlocked || st.cleared ? 1 : 0.6,
             }}
           >
-            <p className="font-mono text-xs font-bold" style={{ color: st.cleared ? color : "var(--ink)" }}>
-              {st.cleared ? "✓" : st.unlocked ? st.index + 1 : <Lock size={11} className="mx-auto" />}
-            </p>
-            <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--ink-soft)" }}>
-              {st.cleared ? "合格" : st.unlocked ? `音読${st.shadowDone}/${st.shadowTotal}` : "ロック"}
-            </p>
-            {!st.cleared && st.unlocked && (
-              <p className="text-[10px] font-mono" style={{ color: st.best > 0 ? "var(--amber)" : "var(--ink-soft)" }}>
-                {st.best > 0 ? `最高${st.best}/${st.shadowTotal}` : "テスト未"}
-              </p>
+            {st.cleared ? (
+              <>
+                <span
+                  className="inline-flex items-center justify-center font-display font-black"
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "50%",
+                    border: `2.5px solid ${color}`,
+                    boxShadow: `inset 0 0 0 2px ${color}`,
+                    color,
+                    transform: "rotate(-12deg)",
+                    fontSize: 11,
+                    letterSpacing: "0.5px",
+                    backgroundColor: "rgba(255,255,255,0.55)",
+                  }}
+                >
+                  合格
+                </span>
+                <p className="text-[10px] font-mono" style={{ color }}>ステージ{st.index + 1}</p>
+              </>
+            ) : (
+              <>
+                <p className="font-mono text-xs font-bold" style={{ color: "var(--ink)" }}>
+                  {st.unlocked ? st.index + 1 : <Lock size={11} className="mx-auto" />}
+                </p>
+                <p className="text-[10px] font-mono" style={{ color: "var(--ink-soft)" }}>
+                  {st.unlocked ? `音読${st.shadowDone}/${st.shadowTotal}` : "ロック"}
+                </p>
+                {st.unlocked && (
+                  <p className="text-[10px] font-mono" style={{ color: st.best > 0 ? "var(--amber)" : "var(--ink-soft)" }}>
+                    {st.best > 0 ? `最高${st.best}/${st.shadowTotal}` : "テスト未"}
+                  </p>
+                )}
+              </>
             )}
           </div>
         ))}
@@ -3606,7 +3638,7 @@ function LearnScreen({
                 <button
                   onClick={stopPlayback}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform"
-                  style={{ backgroundColor: "var(--red)" }}
+                  style={{ backgroundColor: "var(--indigo)" }}
                 >
                   <Square size={16} /> 停止
                 </button>
@@ -3622,7 +3654,7 @@ function LearnScreen({
               <button
                 onClick={() => markShadowBulk(stage)}
                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "mark" ? "guide-glow" : ""}`}
-                style={{ backgroundColor: shadowFull ? "var(--mint)" : "var(--coral)" }}
+                style={{ backgroundColor: "var(--coral)" }}
               >
                 <Mic size={16} /> {shadowFull ? "1周 音読した！（満タン✓）" : `1周 音読した！（あと${repsLeft}周）`}
               </button>
@@ -3670,7 +3702,7 @@ function LearnScreen({
                     ({stage.items.length}
                     {unit})
                   </span>
-                  {stage.cleared && <PassStamp label="合格!" />}
+                  {stage.cleared && <PassStamp label="合格!" size="lg" />}
                   {isNextStage && !stage.cleared && (
                     <span
                       className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
@@ -5271,7 +5303,10 @@ function PronunciationPractice({ stage, stageIndex, speed = 1.0, speak, cancel, 
       </div>
 
       <Card className="p-6 flex flex-col items-center gap-4">
-        <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
+        <p
+          className={`text-sm ${qIndex === 0 && !revealed ? "guide-glow px-3 py-1.5 rounded-full" : ""}`}
+          style={{ color: qIndex === 0 && !revealed ? "var(--indigo)" : "var(--ink-soft)", fontWeight: qIndex === 0 && !revealed ? 700 : 400 }}
+        >
           この数字を英語で声に出して言ってみよう
         </p>
         <p className="font-mono text-5xl font-bold">{fmtNum(value)}</p>
@@ -5524,7 +5559,7 @@ function NumberTestHub({
             <Card key={st.index} className="p-4 space-y-3">
               <p className="font-display font-semibold text-sm flex items-center gap-1.5 flex-wrap">
                 ステージ{st.index + 1}「{NUM_STAGE_TITLES[st.index]}」
-                {st.cleared && <PassStamp label="クリア!" />}
+                {st.cleared && <PassStamp label="クリア!" size="lg" />}
                 {!st.unlocked && (
                   <span
                     className="flex items-center gap-0.5 text-[11px] font-mono px-1.5 py-0.5 rounded-full"
@@ -5930,11 +5965,11 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             {pass && onNextStageLearn ? (
               // ステージの最終テストに合格 → 次のステージの学習へ進むのが基本の流れ
-              <PrimaryButton onClick={onNextStageLearn}>
+              <PrimaryButton onClick={onNextStageLearn} className="guide-glow">
                 次のステージの学習に進む <ChevronRight size={14} />
               </PrimaryButton>
             ) : pass && onNextLevel ? (
-              <PrimaryButton onClick={onNextLevel}>
+              <PrimaryButton onClick={onNextLevel} className="guide-glow">
                 次のテストへ進む <ChevronRight size={14} />
               </PrimaryButton>
             ) : (
