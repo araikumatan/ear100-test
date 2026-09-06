@@ -2399,6 +2399,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   const awardedRef = useRef(false);
   const i1Ref = useRef(null);
   const i2Ref = useRef(null);
+  const resultBtnsRef = useRef(null);
 
   const it = items[idx];
   const done = idx >= items.length;
@@ -2434,6 +2435,21 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   }, [idx, done, result, level]);
 
   useEffect(() => () => cancel(), [cancel]);
+
+  // 答え合わせ結果が出たら「次へ」ボタンにフォーカス（PCでEnter/Spaceで次へ進めるように）
+  useEffect(() => {
+    if (!result) return;
+    const focusNext = () => {
+      const wrap = resultBtnsRef.current;
+      if (!wrap) return;
+      const btn = wrap.querySelector("button:last-child");
+      if (btn) btn.focus();
+    };
+    focusNext();
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(focusNext);
+    const t = window.setTimeout(focusNext, 90);
+    return () => window.clearTimeout(t);
+  }, [result]);
 
   // 完了時に一度だけポイント加算＋学習日記録
   useEffect(() => {
@@ -2520,7 +2536,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
               <span style={{ color: "var(--mint)" }}>正解: {it.disp}</span>
             </div>
           )}
-          <div className="flex items-center justify-center gap-2">
+          <div ref={resultBtnsRef} className="flex items-center justify-center gap-2">
             <GhostButton onClick={() => speak(bonusItemToTarget(it), { rate: 1.0 })}><Play size={14} /> もう一度</GhostButton>
             <PrimaryButton onClick={next}>次へ →</PrimaryButton>
           </div>
@@ -3522,6 +3538,19 @@ function LearnScreen({
                   </div>
                 )}
               </div>
+              {openStages[stage.index] && !(stage.cleared && stage.shadowDone >= stage.shadowTotal) && (
+                <div className="rounded-xl px-3 py-2.5 text-xs leading-relaxed" style={{ backgroundColor: "var(--indigo-soft)", color: "var(--indigo)" }}>
+                  <p className="font-bold mb-1">
+                    🎧 {stage.index < 5 ? `ステージ${stage.index + 1}を解放するには` : "このステージを仕上げよう（最終ステージ）"}
+                  </p>
+                  <p>① <b>セット再生</b>を流しながら、声に出してマネしよう（シャドーイング）。</p>
+                  <p>② ひと回しできたら <b>「全部シャドーイングした！」</b>を押す（各{CONFIG.SHADOW_REQUIRED}回で満タン ／ いま {stage.shadowDone}/{stage.shadowTotal}）。</p>
+                  <p>
+                    ③ さらに <b>テストに合格</b>（全問正解）すると
+                    {stage.index < 5 ? `、ステージ${stage.index + 1}が解放されるよ！` : "、数字パート制覇！"}
+                  </p>
+                </div>
+              )}
               {openStages[stage.index] && (
                 <div className="flex flex-wrap items-center gap-4">
                   <ControlGroup label="リピート" icon={Repeat}>
