@@ -9084,6 +9084,46 @@
       hasEnglishVoice: englishVoices.length > 0
     };
   }
+  function GlowAutoScroll() {
+    (0, import_react3.useEffect)(() => {
+      let lastKey = null;
+      const tick = () => {
+        const els = Array.from(document.querySelectorAll(".guide-glow, .guide-glow-mint"));
+        if (!els.length) {
+          lastKey = null;
+          return;
+        }
+        const vh = window.innerHeight || 800;
+        const vc = vh / 2;
+        let best = null;
+        let bestDist = Infinity;
+        for (const el of els) {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs((r.top + r.bottom) / 2 - vc);
+          if (d < bestDist) {
+            bestDist = d;
+            best = el;
+          }
+        }
+        const r0 = best.getBoundingClientRect();
+        const key = (best.textContent || "").trim().slice(0, 40) + "@" + Math.round((r0.top + window.scrollY) / 40);
+        if (key && key !== lastKey) {
+          lastKey = key;
+          try {
+            best.scrollIntoView({ behavior: "smooth", block: "center" });
+          } catch (e) {
+          }
+        }
+      };
+      const id = window.setInterval(tick, 300);
+      const t0 = window.setTimeout(tick, 60);
+      return () => {
+        window.clearInterval(id);
+        window.clearTimeout(t0);
+      };
+    }, []);
+    return null;
+  }
   function GlobalStyle() {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: `
       @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -13236,6 +13276,7 @@
     }, [wordAll, sentAll, state.celebrated, update]);
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "min-h-screen font-body", style: { background: "var(--bg-grad)", color: "var(--ink)" }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobalStyle, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlowAutoScroll, {}),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         TopNav,
         {

@@ -1636,6 +1636,37 @@ function useSpeech() {
  * 共通 UI パーツ
  * ======================================================================= */
 
+// 点滅（.guide-glow / .guide-glow-mint）中の要素を、対象が変わるたびに画面中央へ自動スクロールする。
+// 各所にrefを配線せず一括対応。guideBarのように同じ点滅が複数あるときはビューポート中央に最も近いものを選ぶ。
+function GlowAutoScroll() {
+  useEffect(() => {
+    let lastKey = null;
+    const tick = () => {
+      const els = Array.from(document.querySelectorAll(".guide-glow, .guide-glow-mint"));
+      if (!els.length) { lastKey = null; return; }
+      const vh = window.innerHeight || 800;
+      const vc = vh / 2;
+      let best = null;
+      let bestDist = Infinity;
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        const d = Math.abs((r.top + r.bottom) / 2 - vc);
+        if (d < bestDist) { bestDist = d; best = el; }
+      }
+      const r0 = best.getBoundingClientRect();
+      const key = ((best.textContent || "").trim().slice(0, 40)) + "@" + Math.round((r0.top + window.scrollY) / 40);
+      if (key && key !== lastKey) {
+        lastKey = key;
+        try { best.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+      }
+    };
+    const id = window.setInterval(tick, 300);
+    const t0 = window.setTimeout(tick, 60);
+    return () => { window.clearInterval(id); window.clearTimeout(t0); };
+  }, []);
+  return null;
+}
+
 function GlobalStyle() {
   return (
     <style>{`
@@ -6225,6 +6256,7 @@ export default function App() {
   return (
     <div className="min-h-screen font-body" style={{ background: "var(--bg-grad)", color: "var(--ink)" }}>
       <GlobalStyle />
+      <GlowAutoScroll />
       <TopNav
         tab={tab}
         setTab={(id) => {
