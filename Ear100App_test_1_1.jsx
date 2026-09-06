@@ -43,6 +43,7 @@ import {
   Calendar as CalendarIcon,
   Sparkles,
   ArrowLeft,
+  ArrowRight,
   Mic,
   AlertTriangle,
   Lock,
@@ -1694,6 +1695,18 @@ function GlobalStyle() {
       @keyframes trophyPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
       .trophy-pulse { animation: trophyPulse 1.1s ease-in-out infinite; }
 
+      /* ガイド用: 次に押すべき1箇所だけを点滅させる（視線誘導） */
+      @keyframes guideGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.0); transform: scale(1); }
+        50% { box-shadow: 0 0 0 6px rgba(99,102,241,0.35); transform: scale(1.04); }
+      }
+      .guide-glow { animation: guideGlow 1.15s ease-in-out infinite; position: relative; z-index: 1; }
+      @keyframes guideGlowMint {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.0); transform: scale(1); }
+        50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.38); transform: scale(1.04); }
+      }
+      .guide-glow-mint { animation: guideGlowMint 1.15s ease-in-out infinite; position: relative; z-index: 1; }
+
       button { font-family: inherit; }
       *:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 
@@ -1704,6 +1717,7 @@ function GlobalStyle() {
         .animate-floatup { animation: none; opacity: 0; }
         .confetti-piece { animation: none; opacity: 0; }
         .trophy-pulse { animation: none; }
+        .guide-glow, .guide-glow-mint { animation: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.4); }
       }
     `}</style>
   );
@@ -3318,6 +3332,8 @@ function LearnScreen({
   const [playingSetIndex, setPlayingSetIndex] = useState(null);
   const [bumpedId, setBumpedId] = useState(null);
   const [bulkBumpStage, setBulkBumpStage] = useState(null);
+  // 直近でセット再生を完了したステージ（「1周音読した！」ボタンを点滅で促すため）
+  const [setPlayedStage, setSetPlayedStage] = useState(null);
 
   const playTokenRef = useRef(0);
 
@@ -3390,6 +3406,7 @@ function LearnScreen({
         setPlayingSetIndex(null);
         setActiveId(null);
         setCurrentRep(0);
+        setSetPlayedStage(stage.index); // セット再生完了 → 「1周音読した！」を点滅で促す
         return;
       }
       const { item, rep } = seq[i++];
@@ -3424,6 +3441,7 @@ function LearnScreen({
       )
     );
     setBulkBumpStage(stage.index);
+    setSetPlayedStage(null); // 音読を記録したら次はまたセット再生（or テスト）を促す
     window.setTimeout(() => setBulkBumpStage(null), 800);
   };
 
@@ -3498,6 +3516,74 @@ function LearnScreen({
         const isPlayingThisSet = playingSetIndex === stage.index;
         // 次にやるべきステージ（解放済み・未クリアの最初）を強調する
         const isNextStage = stage.index === firstUnclearedIndex;
+        // ガイド用: 音読の残り周回数と、次に押すべきアクション（play → mark → test の一本道）
+        const repsLeft = Math.max(0, CONFIG.SHADOW_REQUIRED - (stage.shadowMin || 0));
+        const shadowFull = repsLeft === 0;
+        const justPlayed = setPlayedStage === stage.index;
+        const testUnlocked = shadowFull || devMode;
+        const nextAct = shadowFull ? "test" : justPlayed ? "mark" : "play";
+        // 学習ガイドバー（矢印フロー＋大きな次アクション＋点滅ボタン）。上下2箇所で使う。
+        const guideBar = (
+          <div className="rounded-2xl p-3 space-y-3" style={{ backgroundColor: "var(--indigo-soft)" }}>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-bold flex-wrap" style={{ color: "var(--indigo)" }}>
+              <span>▶ セット再生</span><ArrowRight size={13} /><span>🎙 1周音読した！</span><ArrowRight size={13} /><span>×{CONFIG.SHADOW_REQUIRED}周</span><ArrowRight size={13} /><span>📝 テスト</span>
+            </div>
+            <p className="text-center text-base sm:text-lg font-extrabold" style={{ color: "var(--ink)" }}>
+              {shadowFull
+                ? "3周 音読 完了！つぎは テストへ 🎉"
+                : justPlayed
+                ? "「1周 音読した！」を押そう 🎙"
+                : stage.shadowMin === 0
+                ? `まず「セット再生」で ${CONFIG.SHADOW_REQUIRED}周 音読しよう`
+                : `のこり ${repsLeft}周！「セット再生」で音読しよう`}
+            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {isPlayingThisSet ? (
+                <button
+                  onClick={stopPlayback}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform"
+                  style={{ backgroundColor: "var(--red)" }}
+                >
+                  <Square size={16} /> 停止
+                </button>
+              ) : (
+                <button
+                  onClick={() => playSet(stage)}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "play" ? "guide-glow" : ""}`}
+                  style={{ backgroundColor: "var(--indigo)" }}
+                >
+                  <Play size={16} /> セット再生
+                </button>
+              )}
+              <button
+                onClick={() => markShadowBulk(stage)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "mark" ? "guide-glow" : ""}`}
+                style={{ backgroundColor: shadowFull ? "var(--mint)" : "var(--coral)" }}
+              >
+                <Mic size={16} /> {shadowFull ? "1周 音読した！（満タン✓）" : `1周 音読した！（あと${repsLeft}周）`}
+              </button>
+              {testUnlocked ? (
+                <button
+                  onClick={() => onGoTest && onGoTest(stage.index)}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "test" ? "guide-glow-mint" : ""}`}
+                  style={{ backgroundColor: "var(--mint)" }}
+                >
+                  <ListChecks size={16} /> テストへ
+                </button>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold"
+                  style={{ backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" }}
+                >
+                  <Lock size={13} /> あと{repsLeft}周でテスト
+                </span>
+              )}
+            </div>
+            {bulkBumpStage === stage.index && (
+              <p className="text-center text-xs font-mono font-bold animate-floatup" style={{ color: "var(--mint)" }}>+1周！</p>
+            )}
+          </div>
+        );
         return (
           <div key={stage.index} id={`${kind}-stage-${stage.index}`} className="space-y-3">
             <Card className="p-4 space-y-3" active={isNextStage} activeColor="var(--indigo)">
@@ -3568,35 +3654,13 @@ function LearnScreen({
                     {CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM}回音読済み {stage.shadowDeep}/{stage.shadowTotal}
                   </span>
                 )}
-                {openStages[stage.index] && (
-                  <div className="ml-auto flex items-center gap-2 flex-wrap">
-                    {bulkBumpStage === stage.index && (
-                      <span className="text-[11px] font-mono font-bold animate-floatup" style={{ color: "var(--mint)" }}>
-                        +{stage.items.length}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => markShadowBulk(stage)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform"
-                      style={{ backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--coral)" }}
-                    >
-                      <Mic size={16} />
-                      {stage.shadowMin >= CONFIG.SHADOW_REQUIRED
-                        ? "1周 音読した！（満タン✓）"
-                        : `1周 音読した！（あと${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}回）`}
-                    </button>
-                    {!isPlayingThisSet ? (
-                      <PrimaryButton onClick={() => playSet(stage)}>
-                        <Play size={16} /> セット再生
-                      </PrimaryButton>
-                    ) : (
-                      <DangerButton onClick={stopPlayback}>
-                        <Square size={16} /> 停止
-                      </DangerButton>
-                    )}
+                {openStages[stage.index] && !(stage.cleared && shadowFull) && (
+                  <div className="ml-auto text-[11px] font-semibold" style={{ color: "var(--indigo)" }}>
+                    {shadowFull ? "テスト待ち" : `音読 のこり${repsLeft}周`}
                   </div>
                 )}
               </div>
+              {openStages[stage.index] && guideBar}
               {openStages[stage.index] && !(stage.cleared && stage.shadowDone >= stage.shadowTotal) && (
                 <div className="rounded-xl px-3 py-2.5 text-xs leading-relaxed" style={{ backgroundColor: "var(--indigo-soft)", color: "var(--indigo)" }}>
                   <p className="font-bold mb-1">
@@ -3636,22 +3700,6 @@ function LearnScreen({
                       </Chip>
                     ))}
                   </ControlGroup>
-                  <div className="ml-auto">
-                    {stage.shadowDone >= stage.shadowTotal || devMode ? (
-                      <IndigoButton onClick={() => onGoTest && onGoTest(stage.index)}>
-                        <ListChecks size={15} /> このステージのテストへ
-                      </IndigoButton>
-                    ) : (
-                      // 音読（各3回）が終わるまではテストに進めない
-                      <span
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold"
-                        style={{ backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" }}
-                      >
-                        <Lock size={13} /> 音読あと{stage.shadowTotal - stage.shadowDone}
-                        {unit}でテスト解放
-                      </span>
-                    )}
-                  </div>
                 </div>
               )}
             </Card>
@@ -3711,12 +3759,6 @@ function LearnScreen({
                           <Star size={14} style={{ color: "var(--gold)" }} />
                         )}
                         {shadowOk && <CheckCircle2 size={14} style={{ color: "var(--mint)" }} />}
-                        <span
-                          className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" }}
-                        >
-                          <Mic size={11} /> {count}回
-                        </span>
                       </div>
                     </div>
                   </Card>
@@ -3727,17 +3769,7 @@ function LearnScreen({
 
             {openStages[stage.index] && renderStageExtra && renderStageExtra(stage.index)}
 
-            {openStages[stage.index] && !stage.cleared && stage.shadowDone >= stage.shadowTotal && (
-              <Card className="p-4 flex flex-wrap items-center gap-3">
-                <p className="text-sm flex-1 min-w-[200px]" style={{ color: "var(--ink-soft)" }}>
-                  音読はバッチリ！あとはステージ{stage.index + 1}のテストに全問正解すれば
-                  {stage.index + 1 < stages.length ? "次のステージが解放されます。" : "全ステージ制覇です！"}
-                </p>
-                <IndigoButton onClick={onGoTest}>
-                  <ListChecks size={16} /> テストへ進む
-                </IndigoButton>
-              </Card>
-            )}
+            {openStages[stage.index] && guideBar}
           </div>
         );
       })}
@@ -5189,6 +5221,7 @@ function PronunciationPractice({ stage, stageIndex, speed = 1.0, speak, cancel, 
 
         {!revealed ? (
           <PrimaryButton
+            className="guide-glow"
             onClick={() => {
               setRevealed(true);
               play(value);
@@ -5213,7 +5246,7 @@ function PronunciationPractice({ stage, stageIndex, speed = 1.0, speak, cancel, 
             <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
               言えていたかな？自己採点で次へ
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 rounded-full p-1 guide-glow-mint">
               <button
                 onClick={() => grade(false)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold active:scale-95 transition-transform"
@@ -5504,6 +5537,7 @@ function NumberTestHub({
                         <div className="ml-auto">
                           {open ? (
                             <IndigoButton
+                              className={isNext ? "guide-glow" : ""}
                               onClick={() =>
                                 setMode(
                                   s.n === 1
@@ -5642,6 +5676,7 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
   const [score, setScore] = useState(0);
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState(null); // null | "correct" | "wrong"
+  const [lastWrong, setLastWrong] = useState(""); // 直近に間違えたときの自分の回答（表示用）
   const [wrongList, setWrongList] = useState([]);
   const [celebration, setCelebration] = useState(null);
 
@@ -5743,6 +5778,7 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
   };
 
   const proceed = () => {
+    setLastWrong("");
     if (qIndex + 1 >= total) {
       finish(scoreRef.current);
     } else {
@@ -5782,6 +5818,7 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
         });
       }
       setFeedback("wrong");
+      setLastWrong(input); // 自分の回答を保持（下に表示）
       setInput(""); // 入力をクリアしてすぐ打ち直せるように
       focusInput(); // Enterで確定した後もキーボード入力を続けられるようにフォーカスを戻す
     }
@@ -5795,6 +5832,7 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
     setScore(0);
     setWrongList([]);
     setInput("");
+    setLastWrong("");
     setFeedback(null);
     setCelebration(null);
     setQuestions(buildQuestions());
@@ -5943,6 +5981,10 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
         </div>
       </div>
 
+      <div className="rounded-xl px-4 py-2 text-center text-sm font-bold" style={{ backgroundColor: "var(--amber-soft)", color: "var(--amber)" }}>
+        全{total}問中 {total}問正解で合格！ がんばって 💪
+      </div>
+
       <Card className="p-6 flex flex-col items-center gap-4">
         <div className="flex flex-col items-center gap-2 py-1">
           <EqualizerBars active size={36} barCount={5} color="var(--indigo)" />
@@ -5997,6 +6039,13 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
             <p className="font-semibold text-sm" style={{ color: "var(--red)" }}>
               残念… 正解は {current ? fmtNum(current.value) : ""}
             </p>
+            {lastWrong !== "" && (
+              <div className="text-sm rounded-xl px-3 py-1.5 inline-block" style={{ backgroundColor: "var(--red-soft)" }}>
+                <span style={{ color: "var(--red)" }}>あなた: {fmtNum(parseInt(lastWrong, 10))}</span>
+                {" ／ "}
+                <span style={{ color: "var(--mint)" }}>正解: {current ? fmtNum(current.value) : ""}</span>
+              </div>
+            )}
             <p className="text-xs" style={{ color: "var(--ink-soft)" }}>
               {current ? numToWords(current.value) : ""}
             </p>
@@ -6005,11 +6054,11 @@ function NumberTestRunner({ mode, stages, speed, update, speak, cancel, onBack, 
 
         <div className="flex gap-2">
           {feedback === "wrong" && input === "" ? (
-            <IndigoButton onClick={proceed}>
+            <IndigoButton onClick={proceed} className="guide-glow">
               次へ <ChevronRight size={14} />
             </IndigoButton>
           ) : (
-            <PrimaryButton onClick={submit} disabled={input === "" || feedback === "correct"}>
+            <PrimaryButton onClick={submit} disabled={input === "" || feedback === "correct"} className={input !== "" && feedback !== "correct" ? "guide-glow" : ""}>
               <Check size={14} /> {feedback === "wrong" ? "もう一度答える" : "答える"}
             </PrimaryButton>
           )}

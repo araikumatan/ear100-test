@@ -7373,6 +7373,12 @@
     ["path", { d: "M19 12H5", key: "x3x0zl" }]
   ]);
 
+  // node_modules/lucide-react/dist/esm/icons/arrow-right.js
+  var ArrowRight = createLucideIcon("ArrowRight", [
+    ["path", { d: "M5 12h14", key: "1ays0h" }],
+    ["path", { d: "m12 5 7 7-7 7", key: "xquz4c" }]
+  ]);
+
   // node_modules/lucide-react/dist/esm/icons/award.js
   var Award = createLucideIcon("Award", [
     [
@@ -9136,6 +9142,18 @@
       @keyframes trophyPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
       .trophy-pulse { animation: trophyPulse 1.1s ease-in-out infinite; }
 
+      /* \u30AC\u30A4\u30C9\u7528: \u6B21\u306B\u62BC\u3059\u3079\u304D1\u7B87\u6240\u3060\u3051\u3092\u70B9\u6EC5\u3055\u305B\u308B\uFF08\u8996\u7DDA\u8A98\u5C0E\uFF09 */
+      @keyframes guideGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.0); transform: scale(1); }
+        50% { box-shadow: 0 0 0 6px rgba(99,102,241,0.35); transform: scale(1.04); }
+      }
+      .guide-glow { animation: guideGlow 1.15s ease-in-out infinite; position: relative; z-index: 1; }
+      @keyframes guideGlowMint {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.0); transform: scale(1); }
+        50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.38); transform: scale(1.04); }
+      }
+      .guide-glow-mint { animation: guideGlowMint 1.15s ease-in-out infinite; position: relative; z-index: 1; }
+
       button { font-family: inherit; }
       *:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 
@@ -9146,6 +9164,7 @@
         .animate-floatup { animation: none; opacity: 0; }
         .confetti-piece { animation: none; opacity: 0; }
         .trophy-pulse { animation: none; }
+        .guide-glow, .guide-glow-mint { animation: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.4); }
       }
     ` });
   }
@@ -10633,6 +10652,7 @@
     const [playingSetIndex, setPlayingSetIndex] = (0, import_react3.useState)(null);
     const [bumpedId, setBumpedId] = (0, import_react3.useState)(null);
     const [bulkBumpStage, setBulkBumpStage] = (0, import_react3.useState)(null);
+    const [setPlayedStage, setSetPlayedStage] = (0, import_react3.useState)(null);
     const playTokenRef = (0, import_react3.useRef)(0);
     (0, import_react3.useEffect)(() => {
       return () => {
@@ -10692,6 +10712,7 @@
           setPlayingSetIndex(null);
           setActiveId(null);
           setCurrentRep(0);
+          setSetPlayedStage(stage.index);
           return;
         }
         const { item, rep } = seq[i++];
@@ -10723,6 +10744,7 @@
         )
       );
       setBulkBumpStage(stage.index);
+      setSetPlayedStage(null);
       window.setTimeout(() => setBulkBumpStage(null), 800);
     };
     const title = isWord ? "\u2B50 \u3053\u308C\u3060\u3051\u30DE\u30B9\u30BF\u30FC100\u5358\u8A9E" : isCustom ? "\u2B50 \u30DE\u30A4\u30EA\u30B9\u30C8\u7DF4\u7FD2" : isNum ? "\u2B50 \u6570\u5B57\u30DE\u30B9\u30BF\u30FC" : "\u2B50 \u65E5\u5E38\u30FB\u65C5\u884C\u4F1A\u8A71100\u4F8B\u6587";
@@ -10774,6 +10796,90 @@
         }
         const isPlayingThisSet = playingSetIndex === stage.index;
         const isNextStage = stage.index === firstUnclearedIndex;
+        const repsLeft = Math.max(0, CONFIG.SHADOW_REQUIRED - (stage.shadowMin || 0));
+        const shadowFull = repsLeft === 0;
+        const justPlayed = setPlayedStage === stage.index;
+        const testUnlocked = shadowFull || devMode;
+        const nextAct = shadowFull ? "test" : justPlayed ? "mark" : "play";
+        const guideBar = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl p-3 space-y-3", style: { backgroundColor: "var(--indigo-soft)" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-bold flex-wrap", style: { color: "var(--indigo)" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u25B6 \u30BB\u30C3\u30C8\u518D\u751F" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { size: 13 }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u{1F399} 1\u5468\u97F3\u8AAD\u3057\u305F\uFF01" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { size: 13 }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+              "\xD7",
+              CONFIG.SHADOW_REQUIRED,
+              "\u5468"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { size: 13 }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u{1F4DD} \u30C6\u30B9\u30C8" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-center text-base sm:text-lg font-extrabold", style: { color: "var(--ink)" }, children: shadowFull ? "3\u5468 \u97F3\u8AAD \u5B8C\u4E86\uFF01\u3064\u304E\u306F \u30C6\u30B9\u30C8\u3078 \u{1F389}" : justPlayed ? "\u300C1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\u300D\u3092\u62BC\u305D\u3046 \u{1F399}" : stage.shadowMin === 0 ? `\u307E\u305A\u300C\u30BB\u30C3\u30C8\u518D\u751F\u300D\u3067 ${CONFIG.SHADOW_REQUIRED}\u5468 \u97F3\u8AAD\u3057\u3088\u3046` : `\u306E\u3053\u308A ${repsLeft}\u5468\uFF01\u300C\u30BB\u30C3\u30C8\u518D\u751F\u300D\u3067\u97F3\u8AAD\u3057\u3088\u3046` }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-center gap-2 flex-wrap", children: [
+            isPlayingThisSet ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                onClick: stopPlayback,
+                className: "inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform",
+                style: { backgroundColor: "var(--red)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Square, { size: 16 }),
+                  " \u505C\u6B62"
+                ]
+              }
+            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                onClick: () => playSet(stage),
+                className: `inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "play" ? "guide-glow" : ""}`,
+                style: { backgroundColor: "var(--indigo)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { size: 16 }),
+                  " \u30BB\u30C3\u30C8\u518D\u751F"
+                ]
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                onClick: () => markShadowBulk(stage),
+                className: `inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "mark" ? "guide-glow" : ""}`,
+                style: { backgroundColor: shadowFull ? "var(--mint)" : "var(--coral)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 16 }),
+                  " ",
+                  shadowFull ? "1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u6E80\u30BF\u30F3\u2713\uFF09" : `1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u3042\u3068${repsLeft}\u5468\uFF09`
+                ]
+              }
+            ),
+            testUnlocked ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                onClick: () => onGoTest && onGoTest(stage.index),
+                className: `inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform ${nextAct === "test" ? "guide-glow-mint" : ""}`,
+                style: { backgroundColor: "var(--mint)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ListChecks, { size: 16 }),
+                  " \u30C6\u30B9\u30C8\u3078"
+                ]
+              }
+            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "span",
+              {
+                className: "inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-semibold",
+                style: { backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { size: 13 }),
+                  " \u3042\u3068",
+                  repsLeft,
+                  "\u5468\u3067\u30C6\u30B9\u30C8"
+                ]
+              }
+            )
+          ] }),
+          bulkBumpStage === stage.index && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-center text-xs font-mono font-bold animate-floatup", style: { color: "var(--mint)" }, children: "+1\u5468\uFF01" })
+        ] });
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { id: `${kind}-stage-${stage.index}`, className: "space-y-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-4 space-y-3", active: isNextStage, activeColor: "var(--indigo)", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-x-4 gap-y-2", children: [
@@ -10872,32 +10978,9 @@
                   ]
                 }
               ),
-              openStages[stage.index] && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ml-auto flex items-center gap-2 flex-wrap", children: [
-                bulkBumpStage === stage.index && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "text-[11px] font-mono font-bold animate-floatup", style: { color: "var(--mint)" }, children: [
-                  "+",
-                  stage.items.length
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                  "button",
-                  {
-                    onClick: () => markShadowBulk(stage),
-                    className: "inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform",
-                    style: { backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--coral)" },
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 16 }),
-                      stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u6E80\u30BF\u30F3\u2713\uFF09" : `1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u3042\u3068${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}\u56DE\uFF09`
-                    ]
-                  }
-                ),
-                !isPlayingThisSet ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: () => playSet(stage), children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { size: 16 }),
-                  " \u30BB\u30C3\u30C8\u518D\u751F"
-                ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DangerButton, { onClick: stopPlayback, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Square, { size: 16 }),
-                  " \u505C\u6B62"
-                ] })
-              ] })
+              openStages[stage.index] && !(stage.cleared && shadowFull) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ml-auto text-[11px] font-semibold", style: { color: "var(--indigo)" }, children: shadowFull ? "\u30C6\u30B9\u30C8\u5F85\u3061" : `\u97F3\u8AAD \u306E\u3053\u308A${repsLeft}\u5468` })
             ] }),
+            openStages[stage.index] && guideBar,
             openStages[stage.index] && !(stage.cleared && stage.shadowDone >= stage.shadowTotal) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl px-3 py-2.5 text-xs leading-relaxed", style: { backgroundColor: "var(--indigo-soft)", color: "var(--indigo)" }, children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-bold mb-1", children: [
                 "\u{1F3A7} ",
@@ -10933,27 +11016,7 @@
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ControlGroup, { label: "\u901F\u5EA6", icon: Gauge, children: CONFIG.LEARN_SPEEDS.map((v) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Chip, { active: speedSetting === v, onClick: () => setSpeedSetting(v), children: [
                 v.toFixed(1),
                 "x"
-              ] }, v)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ml-auto", children: stage.shadowDone >= stage.shadowTotal || devMode ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(IndigoButton, { onClick: () => onGoTest && onGoTest(stage.index), children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ListChecks, { size: 15 }),
-                " \u3053\u306E\u30B9\u30C6\u30FC\u30B8\u306E\u30C6\u30B9\u30C8\u3078"
-              ] }) : (
-                // 音読（各3回）が終わるまではテストに進めない
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                  "span",
-                  {
-                    className: "inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold",
-                    style: { backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" },
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { size: 13 }),
-                      " \u97F3\u8AAD\u3042\u3068",
-                      stage.shadowTotal - stage.shadowDone,
-                      unit,
-                      "\u3067\u30C6\u30B9\u30C8\u89E3\u653E"
-                    ]
-                  }
-                )
-              ) })
+              ] }, v)) })
             ] })
           ] }),
           openStages[stage.index] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid sm:grid-cols-2 gap-3", children: stage.items.map((item) => {
@@ -10993,37 +11056,13 @@
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-1.5", children: [
                   bumpedId === item.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-[10px] font-mono font-bold animate-floatup", style: { color: "var(--mint)" }, children: "+1" }),
                   count >= CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { size: 14, style: { color: "var(--gold)" } }),
-                  shadowOk && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: 14, style: { color: "var(--mint)" } }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-                    "span",
-                    {
-                      className: "flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full",
-                      style: { backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" },
-                      children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 11 }),
-                        " ",
-                        count,
-                        "\u56DE"
-                      ]
-                    }
-                  )
+                  shadowOk && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: 14, style: { color: "var(--mint)" } })
                 ] })
               ] })
             ] }, item.id);
           }) }),
           openStages[stage.index] && renderStageExtra && renderStageExtra(stage.index),
-          openStages[stage.index] && !stage.cleared && stage.shadowDone >= stage.shadowTotal && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-4 flex flex-wrap items-center gap-3", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm flex-1 min-w-[200px]", style: { color: "var(--ink-soft)" }, children: [
-              "\u97F3\u8AAD\u306F\u30D0\u30C3\u30C1\u30EA\uFF01\u3042\u3068\u306F\u30B9\u30C6\u30FC\u30B8",
-              stage.index + 1,
-              "\u306E\u30C6\u30B9\u30C8\u306B\u5168\u554F\u6B63\u89E3\u3059\u308C\u3070",
-              stage.index + 1 < stages.length ? "\u6B21\u306E\u30B9\u30C6\u30FC\u30B8\u304C\u89E3\u653E\u3055\u308C\u307E\u3059\u3002" : "\u5168\u30B9\u30C6\u30FC\u30B8\u5236\u8987\u3067\u3059\uFF01"
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(IndigoButton, { onClick: onGoTest, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ListChecks, { size: 16 }),
-              " \u30C6\u30B9\u30C8\u3078\u9032\u3080"
-            ] })
-          ] })
+          openStages[stage.index] && guideBar
         ] }, stage.index);
       })
     ] });
@@ -12311,6 +12350,7 @@
         !revealed ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           PrimaryButton,
           {
+            className: "guide-glow",
             onClick: () => {
               setRevealed(true);
               play(value);
@@ -12337,7 +12377,7 @@
             )
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs", style: { color: "var(--ink-soft)" }, children: "\u8A00\u3048\u3066\u3044\u305F\u304B\u306A\uFF1F\u81EA\u5DF1\u63A1\u70B9\u3067\u6B21\u3078" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex gap-2 rounded-full p-1 guide-glow-mint", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
               {
@@ -12605,6 +12645,7 @@
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ml-auto", children: open ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
                       IndigoButton,
                       {
+                        className: isNext ? "guide-glow" : "",
                         onClick: () => setMode(
                           s.n === 1 ? { type: "speak", stageIndex: st.index } : { type: "stage", stageIndex: st.index, level: s.n }
                         ),
@@ -12735,6 +12776,7 @@
     const [score, setScore] = (0, import_react3.useState)(0);
     const [input, setInput] = (0, import_react3.useState)("");
     const [feedback, setFeedback] = (0, import_react3.useState)(null);
+    const [lastWrong, setLastWrong] = (0, import_react3.useState)("");
     const [wrongList, setWrongList] = (0, import_react3.useState)([]);
     const [celebration, setCelebration] = (0, import_react3.useState)(null);
     const scoreRef = (0, import_react3.useRef)(0);
@@ -12802,6 +12844,7 @@
       setPhase("finished");
     };
     const proceed = () => {
+      setLastWrong("");
       if (qIndex + 1 >= total) {
         finish(scoreRef.current);
       } else {
@@ -12838,6 +12881,7 @@
           });
         }
         setFeedback("wrong");
+        setLastWrong(input);
         setInput("");
         focusInput();
       }
@@ -12850,6 +12894,7 @@
       setScore(0);
       setWrongList([]);
       setInput("");
+      setLastWrong("");
       setFeedback(null);
       setCelebration(null);
       setQuestions(buildQuestions());
@@ -12991,6 +13036,13 @@
         ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 min-w-[100px]", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, { value: qIndex, max: total, color: "var(--indigo)", height: 8 }) })
       ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl px-4 py-2 text-center text-sm font-bold", style: { backgroundColor: "var(--amber-soft)", color: "var(--amber)" }, children: [
+        "\u5168",
+        total,
+        "\u554F\u4E2D ",
+        total,
+        "\u554F\u6B63\u89E3\u3067\u5408\u683C\uFF01 \u304C\u3093\u3070\u3063\u3066 \u{1F4AA}"
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-6 flex flex-col items-center gap-4", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center gap-2 py-1", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EqualizerBars, { active: true, size: 36, barCount: 5, color: "var(--indigo)" }),
@@ -13041,12 +13093,23 @@
             "\u6B8B\u5FF5\u2026 \u6B63\u89E3\u306F ",
             current ? fmtNum(current.value) : ""
           ] }),
+          lastWrong !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-sm rounded-xl px-3 py-1.5 inline-block", style: { backgroundColor: "var(--red-soft)" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: "var(--red)" }, children: [
+              "\u3042\u306A\u305F: ",
+              fmtNum(parseInt(lastWrong, 10))
+            ] }),
+            " \uFF0F ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { color: "var(--mint)" }, children: [
+              "\u6B63\u89E3: ",
+              current ? fmtNum(current.value) : ""
+            ] })
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs", style: { color: "var(--ink-soft)" }, children: current ? numToWords(current.value) : "" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex gap-2", children: feedback === "wrong" && input === "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(IndigoButton, { onClick: proceed, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex gap-2", children: feedback === "wrong" && input === "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(IndigoButton, { onClick: proceed, className: "guide-glow", children: [
           "\u6B21\u3078 ",
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { size: 14 })
-        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: submit, disabled: input === "" || feedback === "correct", children: [
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: submit, disabled: input === "" || feedback === "correct", className: input !== "" && feedback !== "correct" ? "guide-glow" : "", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { size: 14 }),
           " ",
           feedback === "wrong" ? "\u3082\u3046\u4E00\u5EA6\u7B54\u3048\u308B" : "\u7B54\u3048\u308B"
@@ -13531,6 +13594,14 @@ lucide-react/dist/esm/createLucideIcon.js:
    *)
 
 lucide-react/dist/esm/icons/arrow-left.js:
+  (**
+   * @license lucide-react v0.383.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   *)
+
+lucide-react/dist/esm/icons/arrow-right.js:
   (**
    * @license lucide-react v0.383.0 - ISC
    *
