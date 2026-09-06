@@ -8450,7 +8450,9 @@
     // 間違えた問題: mistakes[kind][itemId] = 間違えた回数（復習テストで正解すると卒業＝削除）
     mistakes: { word: {}, sent: {}, custom: {}, num: {} },
     // 大型のお祝いを一度だけ出すためのフラグ
-    celebrated: { word: false, sent: false, num: false, grand: false }
+    celebrated: { word: false, sent: false, num: false, grand: false },
+    // 特典（時間・お金・電話）のテスト合格記録: bonusCleared["time:1"] = true など（mod:level）
+    bonusCleared: {}
   };
   function loadState() {
     try {
@@ -8465,6 +8467,7 @@
           stageStarted: { word: {}, sent: {}, custom: {}, num: {}, ...parsed.stageStarted || {} },
           mistakes: { word: {}, sent: {}, custom: {}, num: {}, ...parsed.mistakes || {} },
           celebrated: { ...DEFAULT_STATE.celebrated, ...parsed.celebrated || {} },
+          bonusCleared: { ...parsed.bonusCleared || {} },
           settings: {
             ...DEFAULT_STATE.settings,
             ...parsed.settings || {},
@@ -8533,6 +8536,10 @@
   });
   var withPoints = (prev, n) => ({ ...prev, totalPoints: prev.totalPoints + n });
   var SHADOW_KEYS = { word: "wordShadow", sent: "sentShadow", custom: "customShadow", num: "numShadow" };
+  var withBonusCleared = (prev, mod, level) => ({
+    ...prev,
+    bonusCleared: { ...prev.bonusCleared || {}, [`${mod}:${level}`]: true }
+  });
   var withShadow = (prev, kind, id) => {
     const k = SHADOW_KEYS[kind];
     return { ...prev, [k]: { ...prev[k], [id]: (prev[k][id] || 0) + 1 } };
@@ -8623,6 +8630,7 @@
     const list = stageChunks.map((stItems, i) => {
       const shadowDone = stItems.filter((it) => (shadowMap[it.id] || 0) >= CONFIG.SHADOW_REQUIRED).length;
       const shadowDeep = stItems.filter((it) => (shadowMap[it.id] || 0) >= CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM).length;
+      const shadowMin = stItems.length ? stItems.reduce((m, it) => Math.min(m, shadowMap[it.id] || 0), Infinity) : 0;
       if (testLevels === 3) {
         const lv = [1, 2, 3].map((n) => {
           const rec = tests[`stage-${i}-t${n}`] || {};
@@ -8642,6 +8650,7 @@
           shadowDone,
           shadowTotal: stItems.length,
           shadowDeep,
+          shadowMin,
           levels: lv,
           hasLevel3,
           // 各テストの解放: 音読完了でt1 → t1合格でt2 → t2合格でt3
@@ -8664,6 +8673,7 @@
         shadowDone,
         shadowTotal: stItems.length,
         shadowDeep,
+        shadowMin,
         best,
         cleared,
         records,
@@ -9571,9 +9581,9 @@
     if (it.type === "phone") return String(v1 || "").replace(/\D/g, "") === it.digits;
     return false;
   }
-  function BonusCat({ mod, section, speak, cancel, update }) {
+  function BonusCat({ mod, section, speak, cancel, update, state }) {
     const cfg = BONUS_DATA[mod];
-    return section === "test" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusTestHub, { mod, speak, cancel, update }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusShadow, { shadow: cfg.shadow, speak, cancel });
+    return section === "test" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusTestHub, { mod, speak, cancel, update, state }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusShadow, { shadow: cfg.shadow, speak, cancel });
   }
   function BonusShadow({ shadow, speak, cancel }) {
     const [playingAll, setPlayingAll] = (0, import_react3.useState)(false);
@@ -9651,40 +9661,54 @@
       }) })
     ] }) });
   }
-  function BonusTestHub({ mod, speak, cancel, update }) {
+  function BonusTestHub({ mod, speak, cancel, update, state }) {
     const [level, setLevel] = (0, import_react3.useState)(0);
+    const clearedMap = state && state.bonusCleared || {};
+    const isCleared = (n) => !!clearedMap[`${mod}:${n}`];
+    const allCleared = isCleared(1) && isCleared(2) && isCleared(3);
     if (level === 0) {
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, { className: "p-4 space-y-2", children: [
+        allCleared && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl px-3 py-2 text-sm font-bold text-center", style: { backgroundColor: "var(--mint-soft)", color: "var(--mint)" }, children: [
+          "\u{1F389} ",
+          BONUS_DATA[mod].label,
+          "\u30D1\u30FC\u30C8 \u5168\u30C6\u30B9\u30C8\u5408\u683C\u6E08\u307F\uFF01"
+        ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs mb-1", style: { color: "var(--ink-soft)" }, children: "\u30C6\u30B9\u30C81\u304B\u3089\u9806\u306B\u6311\u6226\u3002\u5408\u683C\u3059\u308B\u3068\u6B21\u306E\u30C6\u30B9\u30C8\u3078\u9032\u3081\u307E\u3059\uFF08\u3044\u3064\u3067\u3082\u9078\u3079\u307E\u3059\uFF09\u3002" }),
-        [1, 2, 3].map((n) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-          "button",
-          {
-            onClick: () => setLevel(n),
-            className: "w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]",
-            style: { backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" },
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "span",
-                {
-                  className: "w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white",
-                  style: { backgroundColor: "var(--mint)" },
-                  children: n
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex-1 min-w-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold", style: { color: "var(--ink)" }, children: [
-                  "\u30C6\u30B9\u30C8",
-                  n,
-                  "\uFF1A",
-                  BONUS_TEST_LABELS[n - 1]
+        [1, 2, 3].map((n) => {
+          const cleared = isCleared(n);
+          return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "button",
+            {
+              onClick: () => setLevel(n),
+              className: "w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]",
+              style: {
+                backgroundColor: cleared ? "var(--mint-soft)" : "var(--bg-soft)",
+                border: `1px solid ${cleared ? "var(--mint)" : "var(--line)"}`
+              },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "span",
+                  {
+                    className: "w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white",
+                    style: { backgroundColor: "var(--mint)" },
+                    children: cleared ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { size: 16 }) : n
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex-1 min-w-0", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "block text-sm font-semibold", style: { color: "var(--ink)" }, children: [
+                    "\u30C6\u30B9\u30C8",
+                    n,
+                    "\uFF1A",
+                    BONUS_TEST_LABELS[n - 1]
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "block text-xs", style: { color: "var(--ink-soft)" }, children: n === 1 ? "\u8868\u793A\u3092\u898B\u3066\u3001\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u78BA\u8A8D" : n === 2 ? "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u304B\u3089\u30B7\u30E3\u30C3\u30D5\u30EB\u3067\u51FA\u984C" : "\u7DF4\u7FD2\u306B\u51FA\u3066\u3053\u306A\u3044\u65B0\u3057\u3044\u554F\u984C\u3092\u51FA\u984C" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "block text-xs", style: { color: "var(--ink-soft)" }, children: n === 1 ? "\u8868\u793A\u3092\u898B\u3066\u3001\u81EA\u5206\u3067\u8A00\u3048\u308B\u304B\u78BA\u8A8D" : n === 2 ? "\u7DF4\u7FD2\u3057\u305F\u554F\u984C\u304B\u3089\u30B7\u30E3\u30C3\u30D5\u30EB\u3067\u51FA\u984C" : "\u7DF4\u7FD2\u306B\u51FA\u3066\u3053\u306A\u3044\u65B0\u3057\u3044\u554F\u984C\u3092\u51FA\u984C" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: "var(--mint)" }, children: "\u958B\u653E\u4E2D" })
-            ]
-          },
-          n
-        ))
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-semibold", style: { color: cleared ? "var(--mint)" : "var(--ink-soft)" }, children: cleared ? "\u5408\u683C\u6E08\u307F" : "\u6311\u6226\u3059\u308B" })
+              ]
+            },
+            n
+          );
+        })
       ] });
     }
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -9723,6 +9747,7 @@
     const i1Ref = (0, import_react3.useRef)(null);
     const i2Ref = (0, import_react3.useRef)(null);
     const resultBtnsRef = (0, import_react3.useRef)(null);
+    const resultShownAtRef = (0, import_react3.useRef)(0);
     const it = items[idx];
     const done = idx >= items.length;
     const pct = score.t ? Math.round(score.c / score.t * 100) : 0;
@@ -9777,8 +9802,12 @@
       if (!done || awardedRef.current) return;
       awardedRef.current = true;
       const pts = score.c * CONFIG.POINTS_PER_CORRECT + (passed ? BONUS_CLEAR_BONUS : 0);
-      if (pts > 0 && typeof update === "function") {
-        update((prev) => withStudyDayMarked(withPoints(prev, pts), "num"));
+      if (typeof update === "function") {
+        update((prev) => {
+          let s = withStudyDayMarked(withPoints(prev, pts), "num");
+          if (passed) s = withBonusCleared(s, mod, level);
+          return s;
+        });
       }
     }, [done]);
     const retry = () => {
@@ -9847,6 +9876,10 @@
       setResult(null);
       setIdx((v) => v + 1);
     };
+    const onNextClick = (e) => {
+      if (e && e.detail === 0 && Date.now() - resultShownAtRef.current < 350) return;
+      next();
+    };
     if (result) {
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(GhostButton, { onClick: onExit, children: [
@@ -9877,7 +9910,7 @@
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { size: 14 }),
               " \u3082\u3046\u4E00\u5EA6"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryButton, { onClick: next, children: "\u6B21\u3078 \u2192" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryButton, { onClick: onNextClick, children: "\u6B21\u3078 \u2192" })
           ] })
         ] })
       ] });
@@ -9887,6 +9920,7 @@
       const v2 = i2Ref.current ? i2Ref.current.value : "";
       const ok = checkBonus(it, v1, v2);
       setScore((s) => ({ c: s.c + (ok ? 1 : 0), t: s.t + 1 }));
+      resultShownAtRef.current = Date.now();
       setResult({ ok, v1, v2 });
     };
     const selfMark = (ok) => {
@@ -9900,7 +9934,10 @@
         if (i2Ref.current) i2Ref.current.focus();
       };
       const onEnterSubmit = (e) => {
-        if (e.key === "Enter") submit();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submit();
+        }
       };
       if (it.type === "clock")
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-1", children: [
@@ -10001,11 +10038,11 @@
       ] })
     ] });
   }
-  function PillTabs({ tabs, value, onChange, color = "var(--mint)" }) {
+  function PillTabs({ tabs, value, onChange, color = "var(--mint)", wrap = false }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "div",
       {
-        className: "inline-flex p-1 rounded-full gap-1 overflow-x-auto no-scrollbar max-w-full",
+        className: `p-1 rounded-2xl gap-1 max-w-full ${wrap ? "flex flex-wrap" : "inline-flex overflow-x-auto no-scrollbar"}`,
         style: { backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" },
         children: tabs.map((t) => {
           const active = value === t.id;
@@ -10050,15 +10087,15 @@
       {
         className: "sticky top-0 z-30 backdrop-blur bg-white/80 border-b",
         style: { borderColor: "var(--line)" },
-        children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "max-w-5xl mx-auto px-4 py-3 flex items-center gap-3 sm:gap-4", children: [
+        children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "max-w-5xl mx-auto px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "img",
               {
                 src: "./logo.png",
                 alt: "\u65C5\u3059\u308B200\u8A9E100\u30D5\u30EC\u30FC\u30BA",
-                className: "h-10 w-auto",
-                style: { maxWidth: "min(56vw, 240px)", objectFit: "contain" }
+                className: "h-9 sm:h-10 w-auto",
+                style: { maxWidth: "min(60vw, 240px)", objectFit: "contain" }
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -10069,19 +10106,30 @@
                 title: "\u9332\u97F3\u97F3\u58F0\u306E\u5B9F\u9A13\u7528\u30C6\u30B9\u30C8\u7248\u3067\u3059\u3002\u5B66\u7FD2\u30C7\u30FC\u30BF\u306F\u672C\u756A\u30A2\u30D7\u30EA\u3068\u306F\u5225\u306B\u4FDD\u5B58\u3055\u308C\u307E\u3059\u3002",
                 children: "TEST"
               }
-            )
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex sm:hidden items-center gap-1.5 font-mono text-xs ml-auto", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex items-center gap-1 px-2 py-0.5 rounded-full", style: { backgroundColor: "var(--amber-soft)", color: "var(--amber)" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { size: 13 }),
+                points
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "flex items-center gap-1 px-2 py-0.5 rounded-full", style: { backgroundColor: "var(--coral-soft)", color: "var(--coral-dark)" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Flame, { size: 13 }),
+                streak
+              ] })
+            ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar", children: TABS.map((t) => {
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-start gap-1 sm:flex-1", children: TABS.map((t) => {
             const Icon2 = t.icon;
             const isActive = tab === t.id;
             return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "button",
               {
                 onClick: () => setTab(t.id),
-                className: "flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors",
+                className: "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors",
                 style: {
-                  backgroundColor: isActive ? "var(--indigo)" : "transparent",
-                  color: isActive ? "#fff" : "var(--ink-soft)"
+                  backgroundColor: isActive ? "var(--indigo)" : "var(--bg-soft)",
+                  color: isActive ? "#fff" : "var(--ink-soft)",
+                  border: `1px solid ${isActive ? "var(--indigo)" : "var(--line)"}`
                 },
                 children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon2, { size: 16 }),
@@ -10783,15 +10831,13 @@
                 {
                   className: "flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full",
                   style: {
-                    backgroundColor: stage.shadowDone >= stage.shadowTotal ? "var(--mint-soft)" : "var(--bg-soft)",
-                    color: stage.shadowDone >= stage.shadowTotal ? "var(--mint)" : "var(--ink-soft)"
+                    backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint-soft)" : "var(--bg-soft)",
+                    color: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--ink-soft)"
                   },
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 11 }),
-                    " \u97F3\u8AAD ",
-                    stage.shadowDone,
-                    "/",
-                    stage.shadowTotal
+                    " ",
+                    stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "\u97F3\u8AAD \u6E80\u30BF\u30F3\u2713" : `\u97F3\u8AAD \u3042\u3068${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}\u56DE`
                   ]
                 }
               ),
@@ -10831,11 +10877,18 @@
                   "+",
                   stage.items.length
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(ShadowButton, { onClick: () => markShadowBulk(stage), children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { size: 14 }),
-                  " \u5168\u90E8\u30B7\u30E3\u30C9\u30FC\u30A4\u30F3\u30B0\u3057\u305F\uFF01 +",
-                  stage.items.length
-                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                  "button",
+                  {
+                    onClick: () => markShadowBulk(stage),
+                    className: "inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform",
+                    style: { backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--coral)" },
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 16 }),
+                      stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u6E80\u30BF\u30F3\u2713\uFF09" : `1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\uFF08\u3042\u3068${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}\u56DE\uFF09`
+                    ]
+                  }
+                ),
                 !isPlayingThisSet ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PrimaryButton, { onClick: () => playSet(stage), children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { size: 16 }),
                   " \u30BB\u30C3\u30C8\u518D\u751F"
@@ -10848,7 +10901,7 @@
             openStages[stage.index] && !(stage.cleared && stage.shadowDone >= stage.shadowTotal) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl px-3 py-2.5 text-xs leading-relaxed", style: { backgroundColor: "var(--indigo-soft)", color: "var(--indigo)" }, children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "font-bold mb-1", children: [
                 "\u{1F3A7} ",
-                stage.index < 5 ? `\u30B9\u30C6\u30FC\u30B8${stage.index + 1}\u3092\u89E3\u653E\u3059\u308B\u306B\u306F` : "\u3053\u306E\u30B9\u30C6\u30FC\u30B8\u3092\u4ED5\u4E0A\u3052\u3088\u3046\uFF08\u6700\u7D42\u30B9\u30C6\u30FC\u30B8\uFF09"
+                stage.index < 4 ? `\u30B9\u30C6\u30FC\u30B8${stage.index + 2}\u3092\u89E3\u653E\u3059\u308B\u306B\u306F` : "\u3059\u3079\u3066\u30AF\u30EA\u30A2\u3059\u308B\u306B\u306F\uFF08\u6700\u7D42\u30B9\u30C6\u30FC\u30B8\uFF09"
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
                 "\u2460 ",
@@ -10857,20 +10910,22 @@
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
                 "\u2461 \u3072\u3068\u56DE\u3057\u3067\u304D\u305F\u3089 ",
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "\u300C\u5168\u90E8\u30B7\u30E3\u30C9\u30FC\u30A4\u30F3\u30B0\u3057\u305F\uFF01\u300D" }),
-                "\u3092\u62BC\u3059\uFF08\u5404",
-                CONFIG.SHADOW_REQUIRED,
-                "\u56DE\u3067\u6E80\u30BF\u30F3 \uFF0F \u3044\u307E ",
-                stage.shadowDone,
-                "/",
-                stage.shadowTotal,
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "\u300C1\u5468 \u97F3\u8AAD\u3057\u305F\uFF01\u300D" }),
+                "\u30DC\u30BF\u30F3\u3092\u62BC\u3059\uFF08",
+                stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "\u6E80\u30BF\u30F3\u2713" : `\u3042\u3068${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}\u56DE`,
                 "\uFF09\u3002"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
+              unlockMode === "shadow" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
+                "\u2462 \u3053\u306E\u9032\u3081\u65B9\u3092\u7D9A\u3051\u3066\u5404\u9805\u76EE\u3092",
+                CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM,
+                "\u56DE\u97F3\u8AAD\u3059\u308B\u3068",
+                stage.index < 4 ? `\u3001\u30B9\u30C6\u30FC\u30B8${stage.index + 2}\u304C\u89E3\u653E\u3055\u308C\u308B\u3088\uFF01` : "\u3001\u6570\u5B57\u30B9\u30C6\u30FC\u30B8\u5236\u8987\uFF01",
+                "\uFF08\u30C6\u30B9\u30C8\u5408\u683C\u306F\u4EFB\u610F\uFF09"
+              ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
                 "\u2462 \u3055\u3089\u306B ",
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "\u30C6\u30B9\u30C8\u306B\u5408\u683C" }),
                 "\uFF08\u5168\u554F\u6B63\u89E3\uFF09\u3059\u308B\u3068",
-                stage.index < 5 ? `\u3001\u30B9\u30C6\u30FC\u30B8${stage.index + 1}\u304C\u89E3\u653E\u3055\u308C\u308B\u3088\uFF01` : "\u3001\u6570\u5B57\u30D1\u30FC\u30C8\u5236\u8987\uFF01"
+                stage.index < 4 ? `\u3001\u30B9\u30C6\u30FC\u30B8${stage.index + 2}\u304C\u89E3\u653E\u3055\u308C\u308B\u3088\uFF01` : "\u3001\u6570\u5B57\u30B9\u30C6\u30FC\u30B8\u5236\u8987\uFF01"
               ] })
             ] }),
             openStages[stage.index] && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-4", children: [
@@ -10939,11 +10994,19 @@
                   bumpedId === item.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-[10px] font-mono font-bold animate-floatup", style: { color: "var(--mint)" }, children: "+1" }),
                   count >= CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { size: 14, style: { color: "var(--gold)" } }),
                   shadowOk && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { size: 14, style: { color: "var(--mint)" } }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(ShadowButton, { onClick: () => markShadow(item), children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { size: 14 }),
-                    " \u30B7\u30E3\u30C9\u30FC\u30A4\u30F3\u30B0\u3057\u305F\uFF01 ",
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono", children: count })
-                  ] })
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                    "span",
+                    {
+                      className: "flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full",
+                      style: { backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" },
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 11 }),
+                        " ",
+                        count,
+                        "\u56DE"
+                      ]
+                    }
+                  )
                 ] })
               ] })
             ] }, item.id);
@@ -13268,19 +13331,44 @@
             }
           ),
           bonusTab !== "t1" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusComingSoon, { label: bonusTab === "t2" ? "\u7279\u51782" : "\u7279\u51783" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-5", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              PillTabs,
-              {
-                tabs: NUMPART_CATS,
-                value: numPartCat,
-                onChange: (v) => {
-                  cancel();
-                  setNumPartCat(v);
-                  setSection("learn");
-                },
-                color: "var(--mint)"
-              }
-            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-1", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs font-semibold", style: { color: "var(--ink-soft)" }, children: "\u6570\u5B57\u30D1\u30FC\u30C8\u306E\u30E1\u30CB\u30E5\u30FC\uFF08\u30BF\u30C3\u30D7\u3067\u5207\u66FF\uFF09" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                PillTabs,
+                {
+                  tabs: NUMPART_CATS,
+                  value: numPartCat,
+                  onChange: (v) => {
+                    cancel();
+                    setNumPartCat(v);
+                    setSection("learn");
+                  },
+                  color: "var(--mint)",
+                  wrap: true
+                }
+              )
+            ] }),
+            numPartCat !== "stage" && (() => {
+              const cm = state.bonusCleared || {};
+              const n = [1, 2, 3].filter((i) => cm[`${numPartCat}:${i}`]).length;
+              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                "div",
+                {
+                  className: "rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2",
+                  style: {
+                    backgroundColor: n === 3 ? "var(--mint-soft)" : "var(--bg-soft)",
+                    color: n === 3 ? "var(--mint)" : "var(--ink-soft)"
+                  },
+                  children: [
+                    n === 3 ? "\u{1F389} " : "",
+                    BONUS_DATA[numPartCat].label,
+                    "\uFF1A\u30C6\u30B9\u30C8\u5408\u683C ",
+                    n,
+                    "/3"
+                  ]
+                }
+              );
+            })(),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionToggle, { section, setSection, color: "var(--mint)" }),
             numPartCat === "stage" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs -mt-2", style: { color: "var(--ink-soft)" }, children: "\u30B9\u30C6\u30FC\u30B81\uFF081\u301C20\uFF09\u2192 2\uFF082\u6841\u306E\u805E\u304D\u5206\u3051\uFF09\u2192 3\uFF083\u6841\uFF09\u2192 4\uFF084\u6841\uFF09\u2192 5\uFF085\u6841\uFF09\u3068\u6841\u6570\u304C\u5897\u3048\u3066\u3044\u304D\u307E\u3059\u3002" }),
             numPartCat === "stage" ? section === "learn" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-5", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -13326,7 +13414,7 @@
                 },
                 devMode
               }
-            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusCat, { mod: numPartCat, section, speak, cancel, update })
+            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BonusCat, { mod: numPartCat, section, speak, cancel, update, state })
           ] })
         ] }),
         tab === "custom" && CONFIG.SHOW_CUSTOM && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(

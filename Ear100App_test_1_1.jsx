@@ -840,6 +840,8 @@ const DEFAULT_STATE = {
   mistakes: { word: {}, sent: {}, custom: {}, num: {} },
   // 大型のお祝いを一度だけ出すためのフラグ
   celebrated: { word: false, sent: false, num: false, grand: false },
+  // 特典（時間・お金・電話）のテスト合格記録: bonusCleared["time:1"] = true など（mod:level）
+  bonusCleared: {},
 };
 
 function loadState() {
@@ -855,6 +857,7 @@ function loadState() {
         stageStarted: { word: {}, sent: {}, custom: {}, num: {}, ...(parsed.stageStarted || {}) },
         mistakes: { word: {}, sent: {}, custom: {}, num: {}, ...(parsed.mistakes || {}) },
         celebrated: { ...DEFAULT_STATE.celebrated, ...(parsed.celebrated || {}) },
+        bonusCleared: { ...(parsed.bonusCleared || {}) },
         settings: {
           ...DEFAULT_STATE.settings,
           ...(parsed.settings || {}),
@@ -933,6 +936,11 @@ const withNumTestPrefs = (prev, patch) => ({
 });
 const withPoints = (prev, n) => ({ ...prev, totalPoints: prev.totalPoints + n });
 const SHADOW_KEYS = { word: "wordShadow", sent: "sentShadow", custom: "customShadow", num: "numShadow" };
+// 特典テスト合格を記録: bonusCleared["time:2"] = true
+const withBonusCleared = (prev, mod, level) => ({
+  ...prev,
+  bonusCleared: { ...(prev.bonusCleared || {}), [`${mod}:${level}`]: true },
+});
 const withShadow = (prev, kind, id) => {
   const k = SHADOW_KEYS[kind];
   return { ...prev, [k]: { ...prev[k], [id]: (prev[k][id] || 0) + 1 } };
@@ -1048,6 +1056,8 @@ function computeStages(kind, items, state, { alwaysUnlocked = false, chunks = nu
     const shadowDone = stItems.filter((it) => (shadowMap[it.id] || 0) >= CONFIG.SHADOW_REQUIRED).length;
     // 各項目を QUICK_UNLOCK_SHADOW_PER_ITEM 回以上音読した項目数（テストなし解放の判定用）
     const shadowDeep = stItems.filter((it) => (shadowMap[it.id] || 0) >= CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM).length;
+    // ステージ内で最も音読回数が少ない項目の回数（「あと○回で満タン」表示・セット一括音読の進捗用）
+    const shadowMin = stItems.length ? stItems.reduce((m, it) => Math.min(m, shadowMap[it.id] || 0), Infinity) : 0;
 
     // 3段階テスト構成（数字用）: t1=自分で言えるかチェック / t2=練習した問題のテスト / t3=ランダムテスト
     if (testLevels === 3) {
@@ -1071,6 +1081,7 @@ function computeStages(kind, items, state, { alwaysUnlocked = false, chunks = nu
         shadowDone,
         shadowTotal: stItems.length,
         shadowDeep,
+        shadowMin,
         levels: lv,
         hasLevel3,
         // 各テストの解放: 音読完了でt1 → t1合格でt2 → t2合格でt3
@@ -1093,6 +1104,7 @@ function computeStages(kind, items, state, { alwaysUnlocked = false, chunks = nu
       shadowDone,
       shadowTotal: stItems.length,
       shadowDeep,
+      shadowMin,
       best,
       cleared,
       records,
@@ -2231,10 +2243,10 @@ function checkBonus(it, v1, v2) {
 
 // 時間・お金・電話の1カテゴリ。section（learn=音読 / test=テスト）で中身を切り替える。
 // 学習/テストの切替は上位の SectionToggle が担う（内部にトグルは持たない＝両方テスト表示バグの解消）。
-function BonusCat({ mod, section, speak, cancel, update }) {
+function BonusCat({ mod, section, speak, cancel, update, state }) {
   const cfg = BONUS_DATA[mod];
   return section === "test"
-    ? <BonusTestHub mod={mod} speak={speak} cancel={cancel} update={update} />
+    ? <BonusTestHub mod={mod} speak={speak} cancel={cancel} update={update} state={state} />
     : <BonusShadow shadow={cfg.shadow} speak={speak} cancel={cancel} />;
 }
 
@@ -2331,38 +2343,54 @@ function BonusShadow({ shadow, speak, cancel }) {
 }
 
 // テスト3段階のハブ（1→2→3の順に挑戦。合格で次へ進める）
-function BonusTestHub({ mod, speak, cancel, update }) {
+function BonusTestHub({ mod, speak, cancel, update, state }) {
   const [level, setLevel] = useState(0); // 0=一覧 / 1|2|3
+  const clearedMap = (state && state.bonusCleared) || {};
+  const isCleared = (n) => !!clearedMap[`${mod}:${n}`];
+  const allCleared = isCleared(1) && isCleared(2) && isCleared(3);
   if (level === 0) {
     return (
       <Card className="p-4 space-y-2">
+        {allCleared && (
+          <div className="rounded-xl px-3 py-2 text-sm font-bold text-center" style={{ backgroundColor: "var(--mint-soft)", color: "var(--mint)" }}>
+            🎉 {BONUS_DATA[mod].label}パート 全テスト合格済み！
+          </div>
+        )}
         <p className="text-xs mb-1" style={{ color: "var(--ink-soft)" }}>
           テスト1から順に挑戦。合格すると次のテストへ進めます（いつでも選べます）。
         </p>
-        {[1, 2, 3].map((n) => (
-          <button
-            key={n}
-            onClick={() => setLevel(n)}
-            className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]"
-            style={{ backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" }}
-          >
-            <span
-              className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
-              style={{ backgroundColor: "var(--mint)" }}
+        {[1, 2, 3].map((n) => {
+          const cleared = isCleared(n);
+          return (
+            <button
+              key={n}
+              onClick={() => setLevel(n)}
+              className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors active:scale-[0.99]"
+              style={{
+                backgroundColor: cleared ? "var(--mint-soft)" : "var(--bg-soft)",
+                border: `1px solid ${cleared ? "var(--mint)" : "var(--line)"}`,
+              }}
             >
-              {n}
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm font-semibold" style={{ color: "var(--ink)" }}>
-                テスト{n}：{BONUS_TEST_LABELS[n - 1]}
+              <span
+                className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                style={{ backgroundColor: "var(--mint)" }}
+              >
+                {cleared ? <Check size={16} /> : n}
               </span>
-              <span className="block text-xs" style={{ color: "var(--ink-soft)" }}>
-                {n === 1 ? "表示を見て、自分で言えるか確認" : n === 2 ? "練習した問題からシャッフルで出題" : "練習に出てこない新しい問題を出題"}
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold" style={{ color: "var(--ink)" }}>
+                  テスト{n}：{BONUS_TEST_LABELS[n - 1]}
+                </span>
+                <span className="block text-xs" style={{ color: "var(--ink-soft)" }}>
+                  {n === 1 ? "表示を見て、自分で言えるか確認" : n === 2 ? "練習した問題からシャッフルで出題" : "練習に出てこない新しい問題を出題"}
+                </span>
               </span>
-            </span>
-            <span className="text-xs font-semibold" style={{ color: "var(--mint)" }}>開放中</span>
-          </button>
-        ))}
+              <span className="text-xs font-semibold" style={{ color: cleared ? "var(--mint)" : "var(--ink-soft)" }}>
+                {cleared ? "合格済み" : "挑戦する"}
+              </span>
+            </button>
+          );
+        })}
       </Card>
     );
   }
@@ -2400,6 +2428,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   const i1Ref = useRef(null);
   const i2Ref = useRef(null);
   const resultBtnsRef = useRef(null);
+  const resultShownAtRef = useRef(0);
 
   const it = items[idx];
   const done = idx >= items.length;
@@ -2451,13 +2480,17 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
     return () => window.clearTimeout(t);
   }, [result]);
 
-  // 完了時に一度だけポイント加算＋学習日記録
+  // 完了時に一度だけポイント加算＋学習日記録（合格していれば合格記録も）
   useEffect(() => {
     if (!done || awardedRef.current) return;
     awardedRef.current = true;
     const pts = score.c * CONFIG.POINTS_PER_CORRECT + (passed ? BONUS_CLEAR_BONUS : 0);
-    if (pts > 0 && typeof update === "function") {
-      update((prev) => withStudyDayMarked(withPoints(prev, pts), "num"));
+    if (typeof update === "function") {
+      update((prev) => {
+        let s = withStudyDayMarked(withPoints(prev, pts), "num");
+        if (passed) s = withBonusCleared(s, mod, level);
+        return s;
+      });
     }
   }, [done]);
 
@@ -2517,6 +2550,12 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
   }
 
   const next = () => { setResult(null); setIdx((v) => v + 1); };
+  // 「次へ」ボタン: Enterの押しっぱなし（キーリピート）で答え合わせを飛ばして進むのを防ぐ。
+  // キーボード由来のクリック（detail===0）が結果表示直後（350ms以内）に来たら無視する。マウスは常に有効。
+  const onNextClick = (e) => {
+    if (e && e.detail === 0 && Date.now() - resultShownAtRef.current < 350) return;
+    next();
+  };
 
   // 結果表示
   if (result) {
@@ -2538,7 +2577,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
           )}
           <div ref={resultBtnsRef} className="flex items-center justify-center gap-2">
             <GhostButton onClick={() => speak(bonusItemToTarget(it), { rate: 1.0 })}><Play size={14} /> もう一度</GhostButton>
-            <PrimaryButton onClick={next}>次へ →</PrimaryButton>
+            <PrimaryButton onClick={onNextClick}>次へ →</PrimaryButton>
           </div>
         </Card>
       </div>
@@ -2551,6 +2590,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
     const v2 = i2Ref.current ? i2Ref.current.value : "";
     const ok = checkBonus(it, v1, v2);
     setScore((s) => ({ c: s.c + (ok ? 1 : 0), t: s.t + 1 }));
+    resultShownAtRef.current = Date.now();
     setResult({ ok, v1, v2 });
   };
   const selfMark = (ok) => { setScore((s) => ({ c: s.c + (ok ? 1 : 0), t: s.t + 1 })); next(); };
@@ -2559,7 +2599,7 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
     const cls = "w-16 text-center font-mono text-lg rounded-lg px-2 py-2 border";
     const st = { backgroundColor: "var(--bg-soft)", borderColor: "var(--line)", color: "var(--ink)" };
     const focus2 = () => { if (i2Ref.current) i2Ref.current.focus(); };
-    const onEnterSubmit = (e) => { if (e.key === "Enter") submit(); };
+    const onEnterSubmit = (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } };
     if (it.type === "clock")
       return (
         <span className="inline-flex items-center gap-1">
@@ -2642,10 +2682,12 @@ function BonusSession({ mod, level, speak, cancel, update, onExit, onNextLevel }
 }
 
 // 汎用ピルタブ（特典1/2/3・数字パートのカテゴリ選択に使用）
-function PillTabs({ tabs, value, onChange, color = "var(--mint)" }) {
+function PillTabs({ tabs, value, onChange, color = "var(--mint)", wrap = false }) {
   return (
-    <div className="inline-flex p-1 rounded-full gap-1 overflow-x-auto no-scrollbar max-w-full"
-      style={{ backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" }}>
+    <div
+      className={`p-1 rounded-2xl gap-1 max-w-full ${wrap ? "flex flex-wrap" : "inline-flex overflow-x-auto no-scrollbar"}`}
+      style={{ backgroundColor: "var(--bg-soft)", border: "1px solid var(--line)" }}
+    >
       {tabs.map((t) => {
         const active = value === t.id;
         return (
@@ -2693,13 +2735,13 @@ function TopNav({ tab, setTab, points, streak }) {
       className="sticky top-0 z-30 backdrop-blur bg-white/80 border-b"
       style={{ borderColor: "var(--line)" }}
     >
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3 sm:gap-4">
+      <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-2 shrink-0">
           <img
             src="./logo.png"
             alt="旅する200語100フレーズ"
-            className="h-10 w-auto"
-            style={{ maxWidth: "min(56vw, 240px)", objectFit: "contain" }}
+            className="h-9 sm:h-10 w-auto"
+            style={{ maxWidth: "min(60vw, 240px)", objectFit: "contain" }}
           />
           <span
             className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full"
@@ -2708,9 +2750,18 @@ function TopNav({ tab, setTab, points, streak }) {
           >
             TEST
           </span>
+          {/* モバイルではポイント・連続をこの行の右に出す */}
+          <div className="flex sm:hidden items-center gap-1.5 font-mono text-xs ml-auto">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--amber-soft)", color: "var(--amber)" }}>
+              <Star size={13} />{points}
+            </span>
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--coral-soft)", color: "var(--coral-dark)" }}>
+              <Flame size={13} />{streak}
+            </span>
+          </div>
         </div>
 
-        <nav className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <nav className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-start gap-1 sm:flex-1">
           {TABS.map((t) => {
             const Icon = t.icon;
             const isActive = tab === t.id;
@@ -2718,10 +2769,11 @@ function TopNav({ tab, setTab, points, streak }) {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors"
                 style={{
-                  backgroundColor: isActive ? "var(--indigo)" : "transparent",
+                  backgroundColor: isActive ? "var(--indigo)" : "var(--bg-soft)",
                   color: isActive ? "#fff" : "var(--ink-soft)",
+                  border: `1px solid ${isActive ? "var(--indigo)" : "var(--line)"}`,
                 }}
               >
                 <Icon size={16} />
@@ -3488,11 +3540,11 @@ function LearnScreen({
                 <span
                   className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
                   style={{
-                    backgroundColor: stage.shadowDone >= stage.shadowTotal ? "var(--mint-soft)" : "var(--bg-soft)",
-                    color: stage.shadowDone >= stage.shadowTotal ? "var(--mint)" : "var(--ink-soft)",
+                    backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint-soft)" : "var(--bg-soft)",
+                    color: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--ink-soft)",
                   }}
                 >
-                  <Mic size={11} /> 音読 {stage.shadowDone}/{stage.shadowTotal}
+                  <Mic size={11} /> {stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "音読 満タン✓" : `音読 あと${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}回`}
                 </span>
                 <span
                   className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
@@ -3523,9 +3575,16 @@ function LearnScreen({
                         +{stage.items.length}
                       </span>
                     )}
-                    <ShadowButton onClick={() => markShadowBulk(stage)}>
-                      <Check size={14} /> 全部シャドーイングした！ +{stage.items.length}
-                    </ShadowButton>
+                    <button
+                      onClick={() => markShadowBulk(stage)}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white shadow-md active:scale-95 transition-transform"
+                      style={{ backgroundColor: stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "var(--mint)" : "var(--coral)" }}
+                    >
+                      <Mic size={16} />
+                      {stage.shadowMin >= CONFIG.SHADOW_REQUIRED
+                        ? "1周 音読した！（満タン✓）"
+                        : `1周 音読した！（あと${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}回）`}
+                    </button>
                     {!isPlayingThisSet ? (
                       <PrimaryButton onClick={() => playSet(stage)}>
                         <Play size={16} /> セット再生
@@ -3541,14 +3600,24 @@ function LearnScreen({
               {openStages[stage.index] && !(stage.cleared && stage.shadowDone >= stage.shadowTotal) && (
                 <div className="rounded-xl px-3 py-2.5 text-xs leading-relaxed" style={{ backgroundColor: "var(--indigo-soft)", color: "var(--indigo)" }}>
                   <p className="font-bold mb-1">
-                    🎧 {stage.index < 5 ? `ステージ${stage.index + 1}を解放するには` : "このステージを仕上げよう（最終ステージ）"}
+                    🎧 {stage.index < 4 ? `ステージ${stage.index + 2}を解放するには` : "すべてクリアするには（最終ステージ）"}
                   </p>
                   <p>① <b>セット再生</b>を流しながら、声に出してマネしよう（シャドーイング）。</p>
-                  <p>② ひと回しできたら <b>「全部シャドーイングした！」</b>を押す（各{CONFIG.SHADOW_REQUIRED}回で満タン ／ いま {stage.shadowDone}/{stage.shadowTotal}）。</p>
                   <p>
-                    ③ さらに <b>テストに合格</b>（全問正解）すると
-                    {stage.index < 5 ? `、ステージ${stage.index + 1}が解放されるよ！` : "、数字パート制覇！"}
+                    ② ひと回しできたら <b>「1周 音読した！」</b>ボタンを押す（
+                    {stage.shadowMin >= CONFIG.SHADOW_REQUIRED ? "満タン✓" : `あと${Math.max(0, CONFIG.SHADOW_REQUIRED - stage.shadowMin)}回`}）。
                   </p>
+                  {unlockMode === "shadow" ? (
+                    <p>
+                      ③ この進め方を続けて各項目を{CONFIG.QUICK_UNLOCK_SHADOW_PER_ITEM}回音読すると
+                      {stage.index < 4 ? `、ステージ${stage.index + 2}が解放されるよ！` : "、数字ステージ制覇！"}（テスト合格は任意）
+                    </p>
+                  ) : (
+                    <p>
+                      ③ さらに <b>テストに合格</b>（全問正解）すると
+                      {stage.index < 4 ? `、ステージ${stage.index + 2}が解放されるよ！` : "、数字ステージ制覇！"}
+                    </p>
+                  )}
                 </div>
               )}
               {openStages[stage.index] && (
@@ -3642,9 +3711,12 @@ function LearnScreen({
                           <Star size={14} style={{ color: "var(--gold)" }} />
                         )}
                         {shadowOk && <CheckCircle2 size={14} style={{ color: "var(--mint)" }} />}
-                        <ShadowButton onClick={() => markShadow(item)}>
-                          <Check size={14} /> シャドーイングした！ <span className="font-mono">{count}</span>
-                        </ShadowButton>
+                        <span
+                          className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: "var(--bg-soft)", color: "var(--ink-soft)" }}
+                        >
+                          <Mic size={11} /> {count}回
+                        </span>
                       </div>
                     </div>
                   </Card>
@@ -6255,13 +6327,36 @@ export default function App() {
               <BonusComingSoon label={bonusTab === "t2" ? "特典2" : "特典3"} />
             ) : (
               <div className="space-y-5">
-                {/* 数字パート: ステージ1〜5 → 時間 → お金 → 電話 */}
-                <PillTabs
-                  tabs={NUMPART_CATS}
-                  value={numPartCat}
-                  onChange={(v) => { cancel(); setNumPartCat(v); setSection("learn"); }}
-                  color="var(--mint)"
-                />
+                {/* 数字パート: 数字ステージ → 時間 → お金 → 電話（モバイルでも全部見えるよう折返し表示） */}
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold" style={{ color: "var(--ink-soft)" }}>
+                    数字パートのメニュー（タップで切替）
+                  </p>
+                  <PillTabs
+                    tabs={NUMPART_CATS}
+                    value={numPartCat}
+                    onChange={(v) => { cancel(); setNumPartCat(v); setSection("learn"); }}
+                    color="var(--mint)"
+                    wrap
+                  />
+                </div>
+
+                {numPartCat !== "stage" && (() => {
+                  const cm = state.bonusCleared || {};
+                  const n = [1, 2, 3].filter((i) => cm[`${numPartCat}:${i}`]).length;
+                  return (
+                    <div
+                      className="rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2"
+                      style={{
+                        backgroundColor: n === 3 ? "var(--mint-soft)" : "var(--bg-soft)",
+                        color: n === 3 ? "var(--mint)" : "var(--ink-soft)",
+                      }}
+                    >
+                      {n === 3 ? "🎉 " : ""}{BONUS_DATA[numPartCat].label}：テスト合格 {n}/3
+                    </div>
+                  );
+                })()}
+
                 <SectionToggle section={section} setSection={setSection} color="var(--mint)" />
 
                 {numPartCat === "stage" && (
@@ -6315,7 +6410,7 @@ export default function App() {
                     />
                   )
                 ) : (
-                  <BonusCat mod={numPartCat} section={section} speak={speak} cancel={cancel} update={update} />
+                  <BonusCat mod={numPartCat} section={section} speak={speak} cancel={cancel} update={update} state={state} />
                 )}
               </div>
             )}
